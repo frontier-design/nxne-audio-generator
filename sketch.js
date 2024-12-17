@@ -139,7 +139,7 @@ function draw() {
       let cumulativeEffectX = 0;
       let cumulativeEffectY = 0;
 
-      // Attraction Points with Circular Motion
+      // Attraction Points with Localized Circular Motion
       for (let point of attractionPoints) {
         let distance = dist(
           point.x,
@@ -148,17 +148,19 @@ function draw() {
           targetY + sliceHeight / 2
         );
 
-        let distanceFactor = map(distance, 0, width, 1, 0.01);
+        let distanceFactor = map(distance, 0, width / 2, 1, 0.01);
         let freqEnergy =
           smoothSpectrum[
             floor(map(distance, 0, width, 0, smoothSpectrum.length))
           ];
         let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
 
-        // Smooth circular motion
-        let angle = frameCount * 0.03 + distance * 0.001;
-        let dx = cos(angle) * intensity * distanceFactor;
-        let dy = sin(angle) * intensity * distanceFactor;
+        // Localized circular motion: angle based on distance and intensity
+        let angle = (frameCount * 0.01 + distance * 0.001) % TWO_PI; // Time-dependent angle
+        let radius = map(distance, 0, width / 4, 0, 5) * intensity * 0.3; // Smaller localized radius
+
+        let dx = cos(angle) * radius * distanceFactor;
+        let dy = sin(angle) * radius * distanceFactor;
 
         cumulativeEffectX += dx;
         cumulativeEffectY += dy;
