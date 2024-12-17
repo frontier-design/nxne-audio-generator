@@ -153,7 +153,7 @@ function draw() {
         );
 
         if (distToCircle < circle.slider.value()) {
-          let damping = map(distToCircle, 0, circle.slider.value(), 0, 1);
+          let damping = map(distToCircle, 0, circle.slider.value(), 0, 0.7);
           cumulativeEffectX *= damping;
           cumulativeEffectY *= damping;
         }
