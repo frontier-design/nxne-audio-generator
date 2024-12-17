@@ -13,14 +13,13 @@ let isDragging = null;
 let draggingCircle = null;
 let bgColorPicker;
 let isOpaque = true;
-let sliceWidthSlider, sliceHeightSlider;
-let imageInput, audioInput;
-let dampingSlider;
-let previousSpectrum = [];
+let sliceWidthSlider, sliceHeightSlider; // Declare new sliders
+let imageInput, audioInput; // File input elements
+let dampingSlider; // Slider for damping value
 
 function preload() {
-  img = loadImage("assets/images/runTheJewel.png");
-  song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
+  img = loadImage("assets/images/runTheJewel.png"); // Default image
+  song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3"); // Default audio
 }
 
 function setup() {
@@ -29,6 +28,7 @@ function setup() {
   background(0);
   fft = new p5.FFT();
 
+  // UI Elements
   playButton = createButton("Play");
   playButton.position(10, 10);
   playButton.mousePressed(togglePlay);
@@ -52,7 +52,8 @@ function setup() {
   toggleOpacityButton.position(windowWidth - 120, 70);
   toggleOpacityButton.mousePressed(toggleOpacity);
 
-  sliceWidthSlider = createSlider(50, 300, 100, 1);
+  // New Sliders for Slice Width and Height
+  sliceWidthSlider = createSlider(50, 300, 100, 1); // Slider for slice width
   sliceWidthSlider.position(windowWidth - 200, windowHeight - 100);
   createLabel(
     "Slice Width",
@@ -61,7 +62,7 @@ function setup() {
     windowHeight - 120
   );
 
-  sliceHeightSlider = createSlider(50, 300, 100, 1);
+  sliceHeightSlider = createSlider(50, 300, 100, 1); // Slider for slice height
   sliceHeightSlider.position(windowWidth - 200, windowHeight - 50);
   createLabel(
     "Slice Height",
@@ -70,20 +71,22 @@ function setup() {
     windowHeight - 70
   );
 
+  // Image and Audio Upload Inputs
   imageInput = createFileInput(handleImageUpload);
   imageInput.position(10, windowHeight - 70);
-  imageInput.style("margin-top", "15px");
+  imageInput.style("margin-top", "15px"); // Adds 10px padding around the input element
   createLabel("Upload Image", imageInput, 10, windowHeight - 90);
 
   audioInput = createFileInput(handleAudioUpload);
   audioInput.position(150, windowHeight - 100);
-  audioInput.style("margin-top", "15px");
+  audioInput.style("margin-top", "15px"); // Adds 10px padding around the input element
   createLabel("Upload Audio", audioInput, 150, windowHeight - 90);
 
-  dampingSlider = createSlider(0, 1, 0.7, 0.01);
+  dampingSlider = createSlider(0, 1, 0.7, 0.01); // Min: 0, Max: 1, Default: 0.7, Step: 0.01
   dampingSlider.position(10, windowHeight - 140);
   createLabel("Damping Factor", dampingSlider, 10, windowHeight - 160);
 
+  // Add one initial attraction point
   addAttractionPoint();
   imageMode(CENTER);
 }
@@ -91,37 +94,24 @@ function setup() {
 function draw() {
   background(bgColorPicker.value());
 
-  // Smooth the spectrum
   let spectrum = fft.analyze();
-  if (previousSpectrum.length === 0) {
-    previousSpectrum = spectrum.slice();
-  }
+  let numSlices = sliceSlider.value(); // Number of slices
+  let baseSliceWidth = img.width / numSlices; // Base width of slices
+  let baseSliceHeight = img.height / numSlices; // Base height of slices
 
-  let alpha = 0.3; // Smoothing factor (0 = very smooth, 1 = no smoothing)
-  for (let i = 0; i < spectrum.length; i++) {
-    previousSpectrum[i] =
-      alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
-  }
-  let smoothSpectrum = previousSpectrum;
-
-  // Slices setup
-  let numSlices = sliceSlider.value();
-  let baseSliceWidth = img.width / numSlices;
-  let baseSliceHeight = img.height / numSlices;
-
+  // Use sliders to optionally adjust the slice dimensions
   let sliceWidth = baseSliceWidth * (sliceWidthSlider.value() / 100);
   let sliceHeight = baseSliceHeight * (sliceHeightSlider.value() / 100);
 
-  // Reset positions when slice count changes
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
-    let imgX = (width - img.width) / 2;
-    let imgY = (height - img.height) / 2;
+    let imgX = (width - img.width) / 2; // Offset to center image horizontally
+    let imgY = (height - img.height) / 2; // Offset to center image vertically
 
     for (let y = 0; y < numSlices; y++) {
       for (let x = 0; x < numSlices; x++) {
-        let posX = imgX + x * baseSliceWidth;
+        let posX = imgX + x * baseSliceWidth; // Base positions
         let posY = imgY + y * baseSliceHeight;
         originalPositions.push({ x: posX, y: posY });
         animatedPositions.push({ x: posX, y: posY });
@@ -129,7 +119,6 @@ function draw() {
     }
   }
 
-  // Update and render slices
   let index = 0;
   for (let y = 0; y < numSlices; y++) {
     for (let x = 0; x < numSlices; x++) {
@@ -139,7 +128,7 @@ function draw() {
       let cumulativeEffectX = 0;
       let cumulativeEffectY = 0;
 
-      // Attraction Points with Circular Motion
+      // Attraction Points
       for (let point of attractionPoints) {
         let distance = dist(
           point.x,
@@ -148,24 +137,19 @@ function draw() {
           targetY + sliceHeight / 2
         );
 
-        let distanceFactor = map(distance, 0, width, 1, 0.01);
+        let distanceFactor = map(distance, 0, width, 1, 0.1);
         let freqEnergy =
-          smoothSpectrum[
-            floor(map(distance, 0, width, 0, smoothSpectrum.length))
-          ];
+          spectrum[floor(map(distance, 0, width, 0, spectrum.length))];
         let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
+        let dx = (point.x - (targetX + sliceWidth / 2)) / distance;
+        let dy = (point.y - (targetY + sliceHeight / 2)) / distance;
 
-        // Smooth circular motion
-        let angle = frameCount * 0.03 + distance * 0.001;
-        let dx = cos(angle) * intensity * distanceFactor;
-        let dy = sin(angle) * intensity * distanceFactor;
-
-        cumulativeEffectX += dx;
-        cumulativeEffectY += dy;
+        cumulativeEffectX += intensity * dx * distanceFactor;
+        cumulativeEffectY += intensity * dy * distanceFactor;
       }
 
-      // Damping from Motion-Stopping Circles
-      let dampingValue = dampingSlider.value();
+      let dampingValue = dampingSlider.value(); // Get the damping value from slider
+      // Motion-Stopping Circles
       for (let circle of motionStoppingCircles) {
         let distToCircle = dist(
           circle.x,
@@ -187,7 +171,7 @@ function draw() {
         }
       }
 
-      // Smoothly animate slices toward target positions
+      // Smooth motion
       animatedPositions[index].x = lerp(
         animatedPositions[index].x,
         targetX + cumulativeEffectX,
@@ -199,16 +183,16 @@ function draw() {
         0.2
       );
 
-      // Draw the image slice
+      // Draw image slices
       copy(
         img,
-        x * baseSliceWidth,
+        x * baseSliceWidth, // Source coordinates stay tied to the base grid
         y * baseSliceHeight,
         baseSliceWidth,
         baseSliceHeight,
         animatedPositions[index].x,
         animatedPositions[index].y,
-        sliceWidth,
+        sliceWidth, // Scaled dimensions
         sliceHeight
       );
 
@@ -216,7 +200,7 @@ function draw() {
     }
   }
 
-  // Draw attraction points and circles
+  // Draw Points and Circles
   drawAttractionPoints();
   drawMotionStoppingCircles();
 }
@@ -224,14 +208,15 @@ function draw() {
 function handleImageUpload(file) {
   if (file.type === "image") {
     img = loadImage(file.data, () => {
+      // Resize image to fit within 600 x 600 while maintaining aspect ratio
       if (img.width > 600 || img.height > 600) {
         if (img.width > img.height) {
-          img.resize(600, 0);
+          img.resize(600, 0); // Resize width to 600, height adjusts proportionally
         } else {
-          img.resize(0, 600);
+          img.resize(0, 600); // Resize height to 600, width adjusts proportionally
         }
       }
-
+      // Reset positions for the new image
       originalPositions = [];
       animatedPositions = [];
     });
@@ -244,7 +229,7 @@ function handleAudioUpload(file) {
       song.stop();
     }
     song = loadSound(file.data, () => {
-      fft = new p5.FFT();
+      fft = new p5.FFT(); // Reset FFT
       playButton.html("Play");
     });
   }
