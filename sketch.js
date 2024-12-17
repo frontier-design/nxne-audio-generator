@@ -15,6 +15,7 @@ let bgColorPicker;
 let isOpaque = true;
 let sliceWidthSlider, sliceHeightSlider; // Declare new sliders
 let imageInput, audioInput; // File input elements
+let dampingSlider; // Slider for damping value
 
 function preload() {
   img = loadImage("assets/images/runTheJewel.png"); // Default image
@@ -81,6 +82,10 @@ function setup() {
   audioInput.style("margin-top", "15px"); // Adds 10px padding around the input element
   createLabel("Upload Audio", audioInput, 150, windowHeight - 90);
 
+  dampingSlider = createSlider(0, 1, 0.7, 0.01); // Min: 0, Max: 1, Default: 0.7, Step: 0.01
+  dampingSlider.position(10, windowHeight - 140);
+  createLabel("Damping Factor", dampingSlider, 10, windowHeight - 160);
+
   // Add one initial attraction point
   addAttractionPoint();
   imageMode(CENTER);
@@ -143,6 +148,7 @@ function draw() {
         cumulativeEffectY += intensity * dy * distanceFactor;
       }
 
+      let dampingValue = dampingSlider.value(); // Get the damping value from slider
       // Motion-Stopping Circles
       for (let circle of motionStoppingCircles) {
         let distToCircle = dist(
@@ -153,7 +159,13 @@ function draw() {
         );
 
         if (distToCircle < circle.slider.value()) {
-          let damping = map(distToCircle, 0, circle.slider.value(), 0, 0.7);
+          let damping = map(
+            distToCircle,
+            0,
+            circle.slider.value(),
+            0,
+            dampingValue
+          );
           cumulativeEffectX *= damping;
           cumulativeEffectY *= damping;
         }
