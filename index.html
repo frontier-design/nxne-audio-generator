@@ -14,7 +14,47 @@
 </head>
 
 <body>
-  <script src="sketch.js"></script>
+
+  <div id="control-panel">
+    <h3>Playback Controls</h3> <br>
+    <button id="play-button">Play</button>
+    <button id="toggle-opacity-button">Toggle Opacity</button>
+
+    <h3>Slice Controls</h3> <br>
+    <label for="slice-slider">Slices</label><br>
+    <input type="range" id="slice-slider" min="2" max="50" value="10" step="1"> <br>
+
+    <label for="slice-width-slider">Slice Width</label><br>
+    <input type="range" id="slice-width-slider" min="50" max="300" value="100" step="1"><br>
+
+    <label for="slice-height-slider">Slice Height</label><br>
+    <input type="range" id="slice-height-slider" min="50" max="300" value="100" step="1"><br>
+
+    <label for="damping-slider">Damping Factor</label><br>
+    <input type="range" id="damping-slider" min="0" max="1" value="0.7" step="0.01">
+
+    <h3>Interaction Controls</h3> <br>
+    <button id="add-point-button">Add Point</button>
+    <button id="add-circle-button">Add Circle</button>
+
+    <h3>Uploads</h3>
+    <label for="image-input">Upload Image</label>
+    <input type="file" id="image-input" accept="image/*"> <br>
+
+    <label for="audio-input">Upload Audio</label>
+    <input type="file" id="audio-input" accept="audio/*">
+
+    <h3>Background Color</h3> <br>
+    <input type="color" id="bg-color-picker" value="#000000">
+  </div>
+
+  <div id="intensity-panel">
+    <h3>Intensity Controllers</h3>
+  </div>
+
+
+
+  <script src="updated-sketches.js"></script>
 </body>
 
 </html>
