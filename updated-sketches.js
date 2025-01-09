@@ -7,6 +7,7 @@ let isDragging = null;
 let draggingCircle = null;
 let isOpaque = true;
 let previousSpectrum = [];
+let radiusOfInfluence = 250; // Default radius value
 
 // Slider values
 let sliceSliderValue = 10;
@@ -38,6 +39,12 @@ function setup() {
     .getElementById("damping-slider")
     .addEventListener("input", (event) => {
       dampingValue = float(event.target.value);
+    });
+
+  document
+    .getElementById("radius-slider")
+    .addEventListener("input", (event) => {
+      radiusOfInfluence = int(event.target.value);
     });
 
   document
@@ -100,24 +107,37 @@ function draw() {
       let maxIntensity = 0;
 
       if (isPlaying) {
+        // let radiusOfInfluence = width / 3; // Define the radius of strong attraction
+
         for (let point of attractionPoints) {
           let tileCenterX = posX + sliceWidth / 2 + (width - img.width) / 2;
           let tileCenterY = posY + sliceHeight / 2 + (height - img.height) / 2;
 
           let distance = dist(point.x, point.y, tileCenterX, tileCenterY);
-          let distanceFactor = map(distance, 0, width / 2, 10, 0.5);
-          let freqEnergy =
-            smoothSpectrum[
-              floor(map(distance, 0, width, 0, smoothSpectrum.length))
-            ];
-          let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
-          maxIntensity = max(maxIntensity, intensity);
 
-          let dx = (point.x - tileCenterX) * 0.002 * intensity;
-          let dy = (point.y - tileCenterY) * 0.002 * intensity;
+          if (distance < radiusOfInfluence) {
+            // Strong effect inside the radius of influence
+            let distanceFactor = map(distance, 0, radiusOfInfluence, 10, 0.1);
+            let freqEnergy =
+              smoothSpectrum[
+                floor(map(distance, 0, width, 0, smoothSpectrum.length))
+              ];
+            let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
+            maxIntensity = max(maxIntensity, intensity);
 
-          cumulativeEffectX += dx * distanceFactor;
-          cumulativeEffectY += dy * distanceFactor;
+            let dx = (point.x - tileCenterX) * 0.002 * intensity;
+            let dy = (point.y - tileCenterY) * 0.002 * intensity;
+
+            cumulativeEffectX += dx * distanceFactor;
+            cumulativeEffectY += dy * distanceFactor;
+          } else {
+            // Minimal effect outside the radius of influence
+            let distanceFactor = 0.01; // Very weak pull
+            cumulativeEffectX +=
+              (point.x - tileCenterX) * 0.0001 * distanceFactor;
+            cumulativeEffectY +=
+              (point.y - tileCenterY) * 0.0001 * distanceFactor;
+          }
         }
 
         // Adjust slice width and height independently based on proximity and intensity
