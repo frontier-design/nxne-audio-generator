@@ -3,8 +3,6 @@ let song;
 let fft;
 let attractionPoints = [];
 let motionStoppingCircles = [];
-let originalPositions = [];
-let animatedPositions = [];
 let isDragging = null;
 let draggingCircle = null;
 let isOpaque = true;
@@ -12,8 +10,6 @@ let previousSpectrum = [];
 
 // Slider values
 let sliceSliderValue = 10;
-let sliceWidthSliderValue = 100;
-let sliceHeightSliderValue = 100;
 let dampingValue = 0.7;
 let bgColorValue = "#000000";
 
@@ -37,18 +33,6 @@ function setup() {
   document.getElementById("slice-slider").addEventListener("input", (event) => {
     sliceSliderValue = int(event.target.value);
   });
-
-  document
-    .getElementById("slice-width-slider")
-    .addEventListener("input", (event) => {
-      sliceWidthSliderValue = int(event.target.value);
-    });
-
-  document
-    .getElementById("slice-height-slider")
-    .addEventListener("input", (event) => {
-      sliceHeightSliderValue = int(event.target.value);
-    });
 
   document
     .getElementById("damping-slider")
@@ -87,72 +71,60 @@ function setup() {
 function draw() {
   background(bgColorValue);
 
-  // Smooth the spectrum
   let spectrum = fft.analyze();
   if (previousSpectrum.length === 0) {
     previousSpectrum = spectrum.slice();
   }
 
-  let alpha = 0.3; // Smoothing factor
+  let alpha = 0.3; // Smoothing factor for spectrum
   for (let i = 0; i < spectrum.length; i++) {
     previousSpectrum[i] =
       alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
   }
   let smoothSpectrum = previousSpectrum;
 
-  // Slices setup
   let numSlices = sliceSliderValue;
   let baseSliceWidth = img.width / numSlices;
   let baseSliceHeight = img.height / numSlices;
-  let sliceWidth = baseSliceWidth * (sliceWidthSliderValue / 100);
-  let sliceHeight = baseSliceHeight * (sliceHeightSliderValue / 100);
+  let isPlaying = song.isPlaying();
 
-  // Reset positions when slice count changes
-  if (originalPositions.length !== numSlices * numSlices) {
-    originalPositions = [];
-    animatedPositions = [];
-    let imgX = (width - img.width) / 2;
-    let imgY = (height - img.height) / 2;
-
-    for (let y = 0; y < numSlices; y++) {
-      for (let x = 0; x < numSlices; x++) {
-        let posX = imgX + x * baseSliceWidth;
-        let posY = imgY + y * baseSliceHeight;
-        originalPositions.push({ x: posX, y: posY });
-        animatedPositions.push({ x: posX, y: posY });
-      }
-    }
-  }
-
-  // Update and render slices
-  let index = 0;
   for (let y = 0; y < numSlices; y++) {
     for (let x = 0; x < numSlices; x++) {
-      let targetX = originalPositions[index].x;
-      let targetY = originalPositions[index].y;
+      let posX = x * baseSliceWidth;
+      let posY = y * baseSliceHeight;
+      let sliceWidth = baseSliceWidth;
+      let sliceHeight = baseSliceHeight;
+
       let cumulativeEffectX = 0;
       let cumulativeEffectY = 0;
+      let maxIntensity = 0;
 
-      // Attraction point effect
-      for (let point of attractionPoints) {
-        let distance = dist(
-          point.x,
-          point.y,
-          targetX + sliceWidth / 2,
-          targetY + sliceHeight / 2
-        );
-        let distanceFactor = map(distance, 0, width / 2, 2, 0.01);
-        let freqEnergy =
-          smoothSpectrum[
-            floor(map(distance, 0, width, 0, smoothSpectrum.length))
-          ];
-        let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
+      if (isPlaying) {
+        for (let point of attractionPoints) {
+          let tileCenterX = posX + sliceWidth / 2 + (width - img.width) / 2;
+          let tileCenterY = posY + sliceHeight / 2 + (height - img.height) / 2;
 
-        let dx = (point.x - (targetX + sliceWidth / 2)) * 0.001 * intensity;
-        let dy = (point.y - (targetY + sliceHeight / 2)) * 0.001 * intensity;
+          let distance = dist(point.x, point.y, tileCenterX, tileCenterY);
+          let distanceFactor = map(distance, 0, width / 2, 10, 0.5);
+          let freqEnergy =
+            smoothSpectrum[
+              floor(map(distance, 0, width, 0, smoothSpectrum.length))
+            ];
+          let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
+          maxIntensity = max(maxIntensity, intensity);
 
-        cumulativeEffectX += dx * distanceFactor;
-        cumulativeEffectY += dy * distanceFactor;
+          let dx = (point.x - tileCenterX) * 0.002 * intensity;
+          let dy = (point.y - tileCenterY) * 0.002 * intensity;
+
+          cumulativeEffectX += dx * distanceFactor;
+          cumulativeEffectY += dy * distanceFactor;
+        }
+
+        // Adjust slice width and height independently based on proximity and intensity
+        let widthFactor = map(maxIntensity, 0, 500, 1, 0); // More dramatic width change
+        let heightFactor = map(maxIntensity, 0, 500, 1, 0); // More dramatic height change
+        sliceWidth *= widthFactor;
+        sliceHeight *= heightFactor;
       }
 
       // Motion-stopping circle effect
@@ -161,8 +133,8 @@ function draw() {
         let distToCircle = dist(
           circle.x,
           circle.y,
-          animatedPositions[index].x + sliceWidth / 2,
-          animatedPositions[index].y + sliceHeight / 2
+          posX + sliceWidth / 2 + (width - img.width) / 2,
+          posY + sliceHeight / 2 + (height - img.height) / 2
         );
 
         if (distToCircle < circle.slider.value()) {
@@ -178,32 +150,36 @@ function draw() {
         }
       }
 
-      animatedPositions[index].x = lerp(
-        animatedPositions[index].x,
-        targetX + cumulativeEffectX,
-        0.2
-      );
-      animatedPositions[index].y = lerp(
-        animatedPositions[index].y,
-        targetY + cumulativeEffectY,
-        0.2
-      );
-
+      // Draw each tile with a white stroke
       push();
-      copy(
-        img,
-        x * baseSliceWidth,
-        y * baseSliceHeight,
-        baseSliceWidth,
-        baseSliceHeight,
-        animatedPositions[index].x,
-        animatedPositions[index].y,
+      stroke(255); // White stroke
+      strokeWeight(0);
+      fill(0);
+      rect(
+        posX + cumulativeEffectX + (width - img.width) / 2,
+        posY + cumulativeEffectY + (height - img.height) / 2,
         sliceWidth,
         sliceHeight
       );
-      pop();
 
-      index++;
+      // Copy image within the tile boundaries without distortion
+      let clipX = x * baseSliceWidth;
+      let clipY = y * baseSliceHeight;
+      let clipWidth = baseSliceWidth;
+      let clipHeight = baseSliceHeight;
+
+      copy(
+        img,
+        clipX,
+        clipY,
+        clipWidth,
+        clipHeight,
+        posX + cumulativeEffectX + (width - img.width) / 2,
+        posY + cumulativeEffectY + (height - img.height) / 2,
+        baseSliceWidth,
+        baseSliceHeight
+      );
+      pop();
     }
   }
 
@@ -217,20 +193,13 @@ function handleImageUpload(event) {
     img = loadImage(URL.createObjectURL(file), () => {
       const maxDimension = 600; // Maximum width or height
 
-      // Check if the image exceeds the max dimension
       if (img.width > maxDimension || img.height > maxDimension) {
-        // Calculate the scaling factor to fit within max dimensions
         let scaleFactor = min(
           maxDimension / img.width,
           maxDimension / img.height
         );
-
-        // Resize the image while maintaining aspect ratio
         img.resize(img.width * scaleFactor, img.height * scaleFactor);
       }
-
-      originalPositions = [];
-      animatedPositions = [];
     });
   }
 }
