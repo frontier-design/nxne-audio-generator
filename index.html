@@ -20,6 +20,11 @@
     <button id="play-button">Play</button>
     <button id="toggle-opacity-button">Toggle Opacity</button>
 
+    <h3>Actions</h3> <br>
+    <button id="clear-button">Clear All</button>
+    <button id="delete-button">Delete Selected</button>
+
+
     <h3>Slice Controls</h3> <br>
     <label for="slice-slider">Slices</label><br>
     <input type="range" id="slice-slider" min="2" max="50" value="10" step="1"> <br>
@@ -28,9 +33,15 @@
     <input type="range" id="damping-slider" min="0" max="1" value="0.7" step="0.01">
 
     <h3>Interaction Controls</h3> <br>
-    <button id="add-point-button">Add Point</button>
-    <button id="add-circle-button">Add Circle</button> <br>
-    <button id="add-scale-point-button">Add Scale Point</button>
+    <button id="add-point-button">
+      <div class="point attractionPoint"></div> Attraction Point
+    </button>
+    <button id="add-circle-button">
+      <div class="point motionCircle"></div> Motion Stopping Circle
+    </button> <br>
+    <button id="add-scale-point-button">
+      <div class="point scalePoint"></div> Scale Point
+    </button>
 
     <h3> Radius Of Influence </h3> <br>
     <label for="radius-slider"> Attraction Point</label><br>
@@ -38,6 +49,9 @@
     <label for="radius-slider"> Scaling Point</label><br>
     <input type="range" id="scale-radius-slider" min="0" max="1000" value="250" step="10">
 
+    <h3>Path Controls</h3> <br>
+    <label for="path-length-slider">Path Length</label><br>
+    <input type="range" id="path-length-slider" min="0" max="50" value="10" step="1">
 
     <br>
     <h3>Uploads</h3> <br>

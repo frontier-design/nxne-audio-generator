@@ -20,8 +20,10 @@ let draggingScalePoint = null;
 let bgColorPicker;
 let isOpaque = true;
 let previousSpectrum = [];
-let pathLayer; // Off-screen graphics layer
-let pathOpacitySlider;
+let pathHistories = []; // Array to store path histories for each tile
+let pathLengthSlider;
+let selectedItem = null; // Store the last clicked item (point or circle)
+let interactions = [];
 
 let dampingValue = 0.7;
 let lastClearTime = 0; // Store the last time the background was cleared
@@ -35,21 +37,27 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   fft = new p5.FFT();
 
+  // Select elements
   playButton = select("#play-button");
   playButton.mousePressed(togglePlay);
-
   document
     .getElementById("toggle-opacity-button")
     .addEventListener("click", toggleOpacity);
 
+  document.getElementById("clear-button").addEventListener("click", clearAll);
+  document
+    .getElementById("delete-button")
+    .addEventListener("click", deleteSelected);
+
   sliceSlider = select("#slice-slider");
   radiusSlider = select("#radius-slider");
   scaleRadiusSlider = select("#scale-radius-slider");
-  document
-    .getElementById("damping-slider")
-    .addEventListener("input", (event) => {
-      dampingValue = float(event.target.value);
-    });
+  dampingSlider = select("#damping-slider");
+  dampingSlider.input(() => {
+    dampingValue = float(dampingSlider.value());
+  });
+
+  pathLengthSlider = select("#path-length-slider"); // Select path length slider
 
   addPointButton = select("#add-point-button");
   addPointButton.mousePressed(addAttractionPoint);
@@ -90,10 +98,12 @@ function draw() {
   let numSlices = sliceSlider.value();
   let baseSliceWidth = img.width / numSlices;
   let baseSliceHeight = img.height / numSlices;
+  let pathLength = pathLengthSlider.value(); // Get path length from slider
 
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
+    pathHistories = [];
     let imgX = (width - img.width) / 2;
     let imgY = (height - img.height) / 2;
 
@@ -103,6 +113,7 @@ function draw() {
         let posY = imgY + y * baseSliceHeight;
         originalPositions.push({ x: posX, y: posY });
         animatedPositions.push({ x: posX, y: posY });
+        pathHistories.push([]); // Initialize empty history for each tile
       }
     }
   }
@@ -142,7 +153,7 @@ function draw() {
       }
 
       // Apply motion-stopping circles' damping effect
-      let damping = dampingValue; // Use global damping value
+      let damping = dampingValue;
       for (let circle of motionStoppingCircles) {
         let distToCircle = dist(
           circle.x,
@@ -171,13 +182,30 @@ function draw() {
         let scaleRadius = scaleRadiusSlider.value();
 
         if (distance < scaleRadius) {
+          // Get frequency band index based on distance
+          let freqIndex = floor(
+            map(distance, 0, width, 0, smoothSpectrum.length)
+          );
+          freqIndex = constrain(freqIndex, 0, smoothSpectrum.length - 1);
+
+          // Get the intensity from the audio spectrum
+          let audioIntensity = map(
+            smoothSpectrum[freqIndex],
+            0,
+            255,
+            1,
+            scalePoint.intensitySlider.value()
+          );
+
+          // Calculate scaling factor using both distance and audio intensity
           let scalingFactor = map(
             distance,
             0,
             scaleRadius,
-            scalePoint.intensitySlider.value(),
-            0.5
+            audioIntensity, // Use audio intensity as max scaling
+            0.2 // Min scaling when at the edge of the radius
           );
+
           scaleFactor *= scalingFactor;
         }
       }
@@ -196,12 +224,49 @@ function draw() {
         0.2
       );
 
+      // Store the current position and scale in the path history
+      if (pathLength > 0) {
+        pathHistories[index].push({
+          x: animatedPositions[index].x + baseSliceWidth / 2,
+          y: animatedPositions[index].y + baseSliceHeight / 2,
+          scale: scaleFactor,
+        });
+
+        // Ensure the path history length matches the path length slider value
+        while (pathHistories[index].length > pathLength) {
+          pathHistories[index].shift();
+        }
+
+        // Draw the path for the current tile
+        for (let i = 0; i < pathHistories[index].length; i++) {
+          let pos = pathHistories[index][i];
+          let opacity = map(i, 0, pathHistories[index].length, 50, 255); // Gradual fade
+          push();
+          translate(pos.x, pos.y);
+          scale(pos.scale);
+          tint(255, opacity); // Apply fading effect
+          imageMode(CENTER);
+          copy(
+            img,
+            x * baseSliceWidth,
+            y * baseSliceHeight,
+            baseSliceWidth,
+            baseSliceHeight,
+            0,
+            0,
+            baseSliceWidth,
+            baseSliceHeight
+          );
+          pop();
+        }
+      }
+
+      // Draw the current tile at its animated position
       push();
       translate(
-        animatedPositions[index].x + baseSliceWidth / 2,
-        animatedPositions[index].y + baseSliceHeight / 2
+        animatedPositions[index].x + finalSliceWidth / 2,
+        animatedPositions[index].y + finalSliceHeight / 2
       );
-      scale(scaleFactor); // Apply scale visually
       imageMode(CENTER);
       copy(
         img,
@@ -211,8 +276,8 @@ function draw() {
         baseSliceHeight,
         0,
         0,
-        baseSliceWidth,
-        baseSliceHeight
+        finalSliceWidth,
+        finalSliceHeight
       );
       pop();
 
@@ -223,18 +288,6 @@ function draw() {
   drawAttractionPoints();
   drawMotionStoppingCircles();
   drawScalingPoints();
-}
-
-function addScalingPoint() {
-  let newPoint = { x: width / 3, y: height / 3 };
-
-  let intensitySlider = createSlider(0.5, 10, 1, 0.1);
-
-  let panel = select("#intensity-panel");
-  panel.child(intensitySlider);
-
-  newPoint.intensitySlider = intensitySlider;
-  scalingPoints.push(newPoint);
 }
 
 function drawScalingPoints() {
@@ -297,6 +350,9 @@ function addAttractionPoint() {
   };
   newPoint.slider.parent(document.getElementById("intensity-panel"));
   attractionPoints.push(newPoint);
+  interactions.push({ item: newPoint, type: "attraction" });
+
+  console.log("Interactions:", interactions);
 }
 
 function addMotionStoppingCircle() {
@@ -307,49 +363,135 @@ function addMotionStoppingCircle() {
   };
   newCircle.slider.parent(document.getElementById("intensity-panel"));
   motionStoppingCircles.push(newCircle);
+  interactions.push({ item: newCircle, type: "circle" });
+
+  console.log("Interactions:", interactions);
+}
+
+function addScalingPoint() {
+  let newPoint = { x: width / 3, y: height / 3 };
+  let intensitySlider = createSlider(0.5, 10, 1, 0.1);
+  intensitySlider.parent(document.getElementById("intensity-panel"));
+
+  newPoint.intensitySlider = intensitySlider;
+  scalingPoints.push(newPoint);
+  interactions.push({ item: newPoint, type: "scaling" });
+
+  console.log("Interactions:", interactions);
 }
 
 function drawAttractionPoints() {
   for (let point of attractionPoints) {
+    if (
+      selectedItem &&
+      selectedItem.item === point &&
+      selectedItem.type === "attraction"
+    ) {
+      stroke(255); // White stroke for selected item
+      strokeWeight(2);
+    } else {
+      noStroke();
+    }
     fill(isOpaque ? "red" : "rgba(255, 0, 0, 0)");
-    noStroke();
+    ellipse(point.x, point.y, 10);
+  }
+}
+
+function drawScalingPoints() {
+  for (let point of scalingPoints) {
+    if (
+      selectedItem &&
+      selectedItem.item === point &&
+      selectedItem.type === "scaling"
+    ) {
+      stroke(255); // White stroke for selected item
+      strokeWeight(2);
+    } else {
+      noStroke();
+    }
+    fill(isOpaque ? "magenta" : "rgba(255, 0, 0, 0)");
     ellipse(point.x, point.y, 10);
   }
 }
 
 function drawMotionStoppingCircles() {
   for (let circle of motionStoppingCircles) {
+    if (
+      selectedItem &&
+      selectedItem.item === circle &&
+      selectedItem.type === "circle"
+    ) {
+      stroke(255); // White stroke for selected item
+      strokeWeight(2);
+    } else {
+      noStroke();
+    }
     fill(isOpaque ? "rgba(0, 255, 0, 0.3)" : "rgba(0, 255, 0, 0)");
-    noStroke();
     ellipse(circle.x, circle.y, circle.slider.value() * 2);
   }
 }
 
+function clearAll() {
+  attractionPoints = [];
+  scalingPoints = [];
+  motionStoppingCircles = [];
+  interactions = [];
+  selectedItem = null;
+}
+
+function deleteSelected() {
+  if (selectedItem) {
+    // Find the index of the selected item in the interactions array
+    let index = interactions.findIndex(
+      (interaction) => interaction === selectedItem
+    );
+
+    if (index !== -1) {
+      // Remove the selected item from the interactions array
+      interactions.splice(index, 1);
+
+      // Remove the selected item from the corresponding type array
+      if (selectedItem.type === "attraction") {
+        let attractionIndex = attractionPoints.indexOf(selectedItem.item);
+        if (attractionIndex !== -1) attractionPoints.splice(attractionIndex, 1);
+      } else if (selectedItem.type === "scaling") {
+        let scalingIndex = scalingPoints.indexOf(selectedItem.item);
+        if (scalingIndex !== -1) scalingPoints.splice(scalingIndex, 1);
+      } else if (selectedItem.type === "circle") {
+        let circleIndex = motionStoppingCircles.indexOf(selectedItem.item);
+        if (circleIndex !== -1) motionStoppingCircles.splice(circleIndex, 1);
+      }
+
+      selectedItem = null; // Clear the selection after deletion
+    }
+  }
+}
+
 function mousePressed() {
-  for (let i = 0; i < attractionPoints.length; i++) {
+  selectedItem = null; // Clear previous selection
+  isDragging = null;
+  draggingCircle = null;
+  draggingScalePoint = null;
+
+  // Check all interactions (attraction points, circles, scaling points)
+  for (let interaction of interactions) {
+    let item = interaction.item;
     if (
-      dist(mouseX, mouseY, attractionPoints[i].x, attractionPoints[i].y) < 10
+      (interaction.type === "attraction" &&
+        dist(mouseX, mouseY, item.x, item.y) < 10) ||
+      (interaction.type === "circle" &&
+        dist(mouseX, mouseY, item.x, item.y) < item.slider.value()) ||
+      (interaction.type === "scaling" &&
+        dist(mouseX, mouseY, item.x, item.y) < 10)
     ) {
-      isDragging = i;
-      return;
-    }
-  }
-  for (let i = 0; i < motionStoppingCircles.length; i++) {
-    if (
-      dist(
-        mouseX,
-        mouseY,
-        motionStoppingCircles[i].x,
-        motionStoppingCircles[i].y
-      ) < motionStoppingCircles[i].slider.value()
-    ) {
-      draggingCircle = i;
-      return;
-    }
-  }
-  for (let i = 0; i < scalingPoints.length; i++) {
-    if (dist(mouseX, mouseY, scalingPoints[i].x, scalingPoints[i].y) < 10) {
-      draggingScalePoint = i;
+      selectedItem = interaction; // Set selected item
+      if (interaction.type === "attraction") {
+        isDragging = attractionPoints.indexOf(item); // Set dragging for attraction point
+      } else if (interaction.type === "circle") {
+        draggingCircle = motionStoppingCircles.indexOf(item); // Set dragging for circle
+      } else if (interaction.type === "scaling") {
+        draggingScalePoint = scalingPoints.indexOf(item); // Set dragging for scaling point
+      }
       return;
     }
   }
