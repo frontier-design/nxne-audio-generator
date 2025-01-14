@@ -3,86 +3,68 @@ let song;
 let fft;
 let playButton;
 let sliceSlider;
+let dampingSlider;
 let addPointButton;
 let addCircleButton;
+let addScalePointButton;
+let scaleRadiusSlider;
+let radiusSlider;
 let attractionPoints = [];
+let scalingPoints = [];
 let motionStoppingCircles = [];
 let originalPositions = [];
 let animatedPositions = [];
 let isDragging = null;
 let draggingCircle = null;
+let draggingScalePoint = null;
 let bgColorPicker;
 let isOpaque = true;
-let sliceWidthSlider, sliceHeightSlider;
-let imageInput, audioInput;
-let dampingSlider;
 let previousSpectrum = [];
 
+let dampingValue = 0.7;
+let lastClearTime = 0; // Store the last time the background was cleared
+
 function preload() {
-  img = loadImage("assets/images/image-three.jpg");
+  img = loadImage("assets/images/runTheJewel.png");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
 }
 
 function setup() {
-  noStroke();
   createCanvas(windowWidth, windowHeight);
-  background(0);
   fft = new p5.FFT();
 
-  playButton = createButton("Play");
-  playButton.position(10, 10);
+  playButton = select("#play-button");
   playButton.mousePressed(togglePlay);
 
-  sliceSlider = createSlider(2, 50, 10, 1);
-  createLabel("Slices", sliceSlider, 10, 40);
+  document
+    .getElementById("toggle-opacity-button")
+    .addEventListener("click", toggleOpacity);
 
-  addPointButton = createButton("Add Point");
-  addPointButton.position(10, 70);
+  sliceSlider = select("#slice-slider");
+  radiusSlider = select("#radius-slider");
+  scaleRadiusSlider = select("#scale-radius-slider");
+  document
+    .getElementById("damping-slider")
+    .addEventListener("input", (event) => {
+      dampingValue = float(event.target.value);
+    });
+
+  addPointButton = select("#add-point-button");
   addPointButton.mousePressed(addAttractionPoint);
 
-  addCircleButton = createButton("Add Circle");
-  addCircleButton.position(10, 100);
+  addCircleButton = select("#add-circle-button");
   addCircleButton.mousePressed(addMotionStoppingCircle);
 
-  bgColorPicker = createColorPicker("#000000");
-  bgColorPicker.position(10, 130);
-  createLabel(".", bgColorPicker, windowWidth - 70, 25);
+  addScalePointButton = select("#add-scale-point-button");
+  addScalePointButton.mousePressed(addScalingPoint);
 
-  let toggleOpacityButton = createButton("Toggle Opacity");
-  toggleOpacityButton.position(windowWidth - 120, 70);
-  toggleOpacityButton.mousePressed(toggleOpacity);
+  bgColorPicker = select("#bg-color-picker");
 
-  sliceWidthSlider = createSlider(50, 300, 100, 1);
-  sliceWidthSlider.position(windowWidth - 200, windowHeight - 100);
-  createLabel(
-    "Slice Width",
-    sliceWidthSlider,
-    windowWidth - 200,
-    windowHeight - 120
-  );
+  imageInput = select("#image-input");
+  imageInput.changed(handleImageUpload);
 
-  sliceHeightSlider = createSlider(50, 300, 100, 1);
-  sliceHeightSlider.position(windowWidth - 200, windowHeight - 50);
-  createLabel(
-    "Slice Height",
-    sliceHeightSlider,
-    windowWidth - 200,
-    windowHeight - 70
-  );
-
-  imageInput = createFileInput(handleImageUpload);
-  imageInput.position(10, windowHeight - 70);
-  imageInput.style("margin-top", "15px");
-  createLabel("Upload Image", imageInput, 10, windowHeight - 90);
-
-  audioInput = createFileInput(handleAudioUpload);
-  audioInput.position(150, windowHeight - 100);
-  audioInput.style("margin-top", "15px");
-  createLabel("Upload Audio", audioInput, 150, windowHeight - 90);
-
-  dampingSlider = createSlider(0, 1, 0.7, 0.01);
-  dampingSlider.position(10, windowHeight - 140);
-  createLabel("Damping Factor", dampingSlider, 10, windowHeight - 160);
+  audioInput = select("#audio-input");
+  audioInput.changed(handleAudioUpload);
 
   addAttractionPoint();
   imageMode(CENTER);
@@ -91,28 +73,22 @@ function setup() {
 function draw() {
   background(bgColorPicker.value());
 
-  // Smooth the spectrum
   let spectrum = fft.analyze();
   if (previousSpectrum.length === 0) {
     previousSpectrum = spectrum.slice();
   }
 
-  let alpha = 0.3; // Smoothing factor (0 = very smooth, 1 = no smoothing)
+  let alpha = 0.3;
   for (let i = 0; i < spectrum.length; i++) {
     previousSpectrum[i] =
       alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
   }
   let smoothSpectrum = previousSpectrum;
 
-  // Slices setup
   let numSlices = sliceSlider.value();
   let baseSliceWidth = img.width / numSlices;
   let baseSliceHeight = img.height / numSlices;
 
-  let sliceWidth = baseSliceWidth * (sliceWidthSlider.value() / 100);
-  let sliceHeight = baseSliceHeight * (sliceHeightSlider.value() / 100);
-
-  // Reset positions when slice count changes
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
@@ -129,7 +105,6 @@ function draw() {
     }
   }
 
-  // Update and render slices
   let index = 0;
   for (let y = 0; y < numSlices; y++) {
     for (let x = 0; x < numSlices; x++) {
@@ -138,55 +113,52 @@ function draw() {
 
       let cumulativeEffectX = 0;
       let cumulativeEffectY = 0;
+      let scaleFactor = 1;
 
-      // Attraction Points without Rotation
+      // Apply attraction points' influence (unchanged)
       for (let point of attractionPoints) {
-        let distance = dist(
-          point.x,
-          point.y,
-          targetX + sliceWidth / 2,
-          targetY + sliceHeight / 2
-        );
+        let distance = dist(point.x, point.y, targetX, targetY);
 
-        let distanceFactor = map(distance, 0, width / 2, 2, 0.01);
-        let freqEnergy =
-          smoothSpectrum[
-            floor(map(distance, 0, width, 0, smoothSpectrum.length))
-          ];
-        let intensity = map(freqEnergy, 0, 255, 0, point.slider.value());
-
-        // Linear motion effect only (no rotation)
-        let dx = (point.x - (targetX + sliceWidth / 2)) * 0.001 * intensity;
-        let dy = (point.y - (targetY + sliceHeight / 2)) * 0.001 * intensity;
-
-        cumulativeEffectX += dx * distanceFactor;
-        cumulativeEffectY += dy * distanceFactor;
-      }
-
-      // Damping from Motion-Stopping Circles
-      let dampingValue = dampingSlider.value();
-      for (let circle of motionStoppingCircles) {
-        let distToCircle = dist(
-          circle.x,
-          circle.y,
-          animatedPositions[index].x + sliceWidth / 2,
-          animatedPositions[index].y + sliceHeight / 2
-        );
-
-        if (distToCircle < circle.slider.value()) {
-          let damping = map(
-            distToCircle,
+        if (distance < radiusSlider.value()) {
+          let distanceFactor = map(distance, 0, radiusSlider.value(), 10, 0.1);
+          let intensity = map(
+            smoothSpectrum[
+              floor(map(distance, 0, width, 0, smoothSpectrum.length))
+            ],
             0,
-            circle.slider.value(),
+            255,
             0,
-            dampingValue
+            point.slider.value()
           );
-          cumulativeEffectX *= damping;
-          cumulativeEffectY *= damping;
+
+          let dx = (point.x - targetX) * 0.002 * intensity;
+          let dy = (point.y - targetY) * 0.002 * intensity;
+
+          cumulativeEffectX += dx * distanceFactor;
+          cumulativeEffectY += dy * distanceFactor;
         }
       }
 
-      // Smoothly animate slices toward target positions
+      // Apply scaling points' influence
+      for (let scalePoint of scalingPoints) {
+        let distance = dist(scalePoint.x, scalePoint.y, targetX, targetY);
+        let scaleRadius = scaleRadiusSlider.value();
+
+        if (distance < scaleRadius) {
+          let scalingFactor = map(
+            distance,
+            0,
+            scaleRadius,
+            scalePoint.intensitySlider.value(),
+            0.5
+          );
+          scaleFactor *= scalingFactor;
+        }
+      }
+
+      let finalSliceWidth = baseSliceWidth * scaleFactor;
+      let finalSliceHeight = baseSliceHeight * scaleFactor;
+
       animatedPositions[index].x = lerp(
         animatedPositions[index].x,
         targetX + cumulativeEffectX,
@@ -199,58 +171,115 @@ function draw() {
       );
 
       push();
-
+      translate(
+        animatedPositions[index].x + finalSliceWidth / 2,
+        animatedPositions[index].y + finalSliceHeight / 2
+      );
+      imageMode(CENTER);
       copy(
         img,
         x * baseSliceWidth,
         y * baseSliceHeight,
         baseSliceWidth,
         baseSliceHeight,
-        animatedPositions[index].x,
-        animatedPositions[index].y,
-        sliceWidth,
-        sliceHeight
+        0,
+        0,
+        finalSliceWidth,
+        finalSliceHeight
       );
-
       pop();
-      // Draw the image slice
 
       index++;
     }
   }
 
-  // Draw attraction points and circles
   drawAttractionPoints();
   drawMotionStoppingCircles();
+  drawScalingPoints();
 }
 
-function handleImageUpload(file) {
-  if (file.type === "image") {
-    img = loadImage(file.data, () => {
-      if (img.width > 600 || img.height > 600) {
-        if (img.width > img.height) {
-          img.resize(600, 0);
-        } else {
-          img.resize(0, 600);
-        }
-      }
+function addScalingPoint() {
+  let newPoint = { x: width / 3, y: height / 3 };
 
-      originalPositions = [];
-      animatedPositions = [];
+  let intensitySlider = createSlider(0.5, 10, 1, 0.1);
+
+  let panel = select("#intensity-panel");
+  panel.child(intensitySlider);
+
+  newPoint.intensitySlider = intensitySlider;
+  scalingPoints.push(newPoint);
+}
+
+function drawScalingPoints() {
+  for (let point of scalingPoints) {
+    fill(isOpaque ? "magenta" : "rgba(255, 0, 0, 0)");
+    noStroke();
+    ellipse(point.x, point.y, 10);
+  }
+}
+
+function handleImageUpload(event) {
+  let file = event.target.files[0];
+  if (file && file.type.startsWith("image")) {
+    img = loadImage(URL.createObjectURL(file), () => {
+      const maxDimension = 600;
+
+      if (img.width > maxDimension || img.height > maxDimension) {
+        let scaleFactor = min(
+          maxDimension / img.width,
+          maxDimension / img.height
+        );
+        img.resize(img.width * scaleFactor, img.height * scaleFactor);
+      }
     });
   }
 }
 
-function handleAudioUpload(file) {
-  if (file.type === "audio") {
+function handleAudioUpload(event) {
+  let file = event.target.files[0];
+  if (file && file.type.startsWith("audio")) {
     if (song.isPlaying()) {
       song.stop();
     }
-    song = loadSound(file.data, () => {
+    song = loadSound(URL.createObjectURL(file), () => {
       fft = new p5.FFT();
-      playButton.html("Play");
+      document.getElementById("play-button").innerText = "Play";
     });
   }
+}
+
+function togglePlay() {
+  if (song.isPlaying()) {
+    song.stop();
+    document.getElementById("play-button").innerText = "Play";
+  } else {
+    song.loop();
+    document.getElementById("play-button").innerText = "Stop";
+  }
+}
+
+function toggleOpacity() {
+  isOpaque = !isOpaque;
+}
+
+function addAttractionPoint() {
+  let newPoint = {
+    x: width / 2,
+    y: height / 2,
+    slider: createSlider(0, 500, 250),
+  };
+  newPoint.slider.parent(document.getElementById("intensity-panel"));
+  attractionPoints.push(newPoint);
+}
+
+function addMotionStoppingCircle() {
+  let newCircle = {
+    x: random(width),
+    y: random(height),
+    slider: createSlider(50, 300, 150),
+  };
+  newCircle.slider.parent(document.getElementById("intensity-panel"));
+  motionStoppingCircles.push(newCircle);
 }
 
 function drawAttractionPoints() {
@@ -267,57 +296,6 @@ function drawMotionStoppingCircles() {
     noStroke();
     ellipse(circle.x, circle.y, circle.slider.value() * 2);
   }
-}
-
-function togglePlay() {
-  if (song.isPlaying()) {
-    song.stop();
-    playButton.html("Play");
-  } else {
-    song.loop();
-    playButton.html("Stop");
-  }
-}
-
-function toggleOpacity() {
-  isOpaque = !isOpaque;
-}
-
-function addAttractionPoint() {
-  let newPoint = {
-    x: random(width),
-    y: random(height),
-    slider: createSlider(0, 500, 250),
-  };
-  createLabel(
-    `Point ${attractionPoints.length + 1} Intensity`,
-    newPoint.slider,
-    10,
-    150 + attractionPoints.length * 50
-  );
-  attractionPoints.push(newPoint);
-}
-
-function addMotionStoppingCircle() {
-  let newCircle = {
-    x: random(width),
-    y: random(height),
-    slider: createSlider(50, 300, 150),
-  };
-  createLabel(
-    `Circle ${motionStoppingCircles.length + 1} Radius`,
-    newCircle.slider,
-    150,
-    150 + motionStoppingCircles.length * 50
-  );
-  motionStoppingCircles.push(newCircle);
-}
-
-function createLabel(labelText, slider, x, y) {
-  let label = createDiv(labelText);
-  label.style("color", "white");
-  label.position(x, y - 10);
-  slider.position(x, y);
 }
 
 function mousePressed() {
@@ -342,6 +320,12 @@ function mousePressed() {
       return;
     }
   }
+  for (let i = 0; i < scalingPoints.length; i++) {
+    if (dist(mouseX, mouseY, scalingPoints[i].x, scalingPoints[i].y) < 10) {
+      draggingScalePoint = i;
+      return;
+    }
+  }
 }
 
 function mouseDragged() {
@@ -353,9 +337,14 @@ function mouseDragged() {
     motionStoppingCircles[draggingCircle].x = mouseX;
     motionStoppingCircles[draggingCircle].y = mouseY;
   }
+  if (draggingScalePoint !== null) {
+    scalingPoints[draggingScalePoint].x = mouseX;
+    scalingPoints[draggingScalePoint].y = mouseY;
+  }
 }
 
 function mouseReleased() {
   isDragging = null;
   draggingCircle = null;
+  draggingScalePoint = null;
 }

@@ -29,15 +29,18 @@
 
     <h3>Interaction Controls</h3> <br>
     <button id="add-point-button">Add Point</button>
-    <button id="add-circle-button">Add Circle</button>
+    <button id="add-circle-button">Add Circle</button> <br>
+    <button id="add-scale-point-button">Add Scale Point</button>
 
-    <h3>Attraction Point Radius</h3> <br>
-    <label for="radius-slider">Radius of Influence</label><br>
-    <input type="range" id="radius-slider" min="50" max="1000" value="250" step="10">
+    <h3> Radius Of Influence </h3> <br>
+    <label for="radius-slider"> Attraction Point</label><br>
+    <input type="range" id="radius-slider" min="50" max="1000" value="250" step="10"> <br>
+    <label for="radius-slider"> Scaling Point</label><br>
+    <input type="range" id="scale-radius-slider" min="0" max="1000" value="250" step="10">
 
 
     <br>
-    <h3>Uploads</h3>
+    <h3>Uploads</h3> <br>
     <label for="image-input">Upload Image</label>
     <input type="file" id="image-input" accept="image/*"> <br>
 
@@ -54,7 +57,7 @@
 
 
 
-  <script src="updated-sketches.js"></script>
+  <script src="./sketch.js"></script>
 </body>
 
 </html>
