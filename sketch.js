@@ -45,9 +45,6 @@ function setup() {
     .addEventListener("click", toggleOpacity);
 
   document.getElementById("clear-button").addEventListener("click", clearAll);
-  document
-    .getElementById("delete-button")
-    .addEventListener("click", deleteSelected);
 
   sliceSlider = select("#slice-slider");
   radiusSlider = select("#radius-slider");
@@ -432,70 +429,69 @@ function drawMotionStoppingCircles() {
 }
 
 function clearAll() {
+  // Clear the arrays storing interaction points and circles
   attractionPoints = [];
   scalingPoints = [];
   motionStoppingCircles = [];
   interactions = [];
   selectedItem = null;
-}
 
-function deleteSelected() {
-  if (selectedItem) {
-    // Find the index of the selected item in the interactions array
-    let index = interactions.findIndex(
-      (interaction) => interaction === selectedItem
-    );
-
-    if (index !== -1) {
-      // Remove the selected item from the interactions array
-      interactions.splice(index, 1);
-
-      // Remove the selected item from the corresponding type array
-      if (selectedItem.type === "attraction") {
-        let attractionIndex = attractionPoints.indexOf(selectedItem.item);
-        if (attractionIndex !== -1) attractionPoints.splice(attractionIndex, 1);
-      } else if (selectedItem.type === "scaling") {
-        let scalingIndex = scalingPoints.indexOf(selectedItem.item);
-        if (scalingIndex !== -1) scalingPoints.splice(scalingIndex, 1);
-      } else if (selectedItem.type === "circle") {
-        let circleIndex = motionStoppingCircles.indexOf(selectedItem.item);
-        if (circleIndex !== -1) motionStoppingCircles.splice(circleIndex, 1);
-      }
-
-      selectedItem = null; // Clear the selection after deletion
-    }
-  }
+  // Remove only the sliders from the intensity panel
+  let sliders = selectAll("input[type='range']", "#intensity-panel");
+  sliders.forEach((slider) => slider.remove());
 }
 
 function mousePressed() {
-  selectedItem = null; // Clear previous selection
+  let foundItem = false; // Flag to track if an item was found
+
+  // Clear previous selection and dragging variables
+  selectedItem = null;
   isDragging = null;
   draggingCircle = null;
   draggingScalePoint = null;
 
-  // Check all interactions (attraction points, circles, scaling points)
-  for (let interaction of interactions) {
-    let item = interaction.item;
-    if (
-      (interaction.type === "attraction" &&
-        dist(mouseX, mouseY, item.x, item.y) < 10) ||
-      (interaction.type === "circle" &&
-        dist(mouseX, mouseY, item.x, item.y) < item.slider.value()) ||
-      (interaction.type === "scaling" &&
-        dist(mouseX, mouseY, item.x, item.y) < 10)
-    ) {
-      selectedItem = interaction; // Set selected item
-      if (interaction.type === "attraction") {
-        isDragging = attractionPoints.indexOf(item); // Set dragging for attraction point
-      } else if (interaction.type === "circle") {
-        draggingCircle = motionStoppingCircles.indexOf(item); // Set dragging for circle
-      } else if (interaction.type === "scaling") {
-        draggingScalePoint = scalingPoints.indexOf(item); // Set dragging for scaling point
-      }
-      return;
+  // Check for attraction points
+  attractionPoints.forEach((point, i) => {
+    console.log(`Checking attraction point ${i} at (${point.x}, ${point.y})`);
+    if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+      selectedItem = { item: point, type: "attraction" };
+      isDragging = i;
+      foundItem = true;
     }
+  });
+
+  // Check for motion-stopping circles
+  motionStoppingCircles.forEach((circle, i) => {
+    console.log(`Checking circle ${i} at (${circle.x}, ${circle.y})`);
+    if (dist(mouseX, mouseY, circle.x, circle.y) < circle.slider.value()) {
+      selectedItem = { item: circle, type: "circle" };
+      draggingCircle = i;
+      foundItem = true;
+    }
+  });
+
+  // Check for scaling points
+  scalingPoints.forEach((point, i) => {
+    console.log(`Checking scaling point ${i} at (${point.x}, ${point.y})`);
+    if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+      selectedItem = { item: point, type: "scaling" };
+      draggingScalePoint = i;
+      foundItem = true;
+    }
+  });
+
+  // If no item is found, clear the selection
+  if (!foundItem) {
+    selectedItem = null;
   }
+
+  // Log the selected item and mouse position for debugging
+  console.log("Mouse clicked at:", mouseX, mouseY);
+  console.log("Mouse pressed. Selected item:", selectedItem);
 }
+
+console.log("Selected Item Reference:", selectedItem);
+console.log("Interactions Array:", interactions);
 
 function mouseDragged() {
   if (isDragging !== null) {
