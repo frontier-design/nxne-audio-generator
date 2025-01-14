@@ -20,6 +20,8 @@ let draggingScalePoint = null;
 let bgColorPicker;
 let isOpaque = true;
 let previousSpectrum = [];
+let pathLayer; // Off-screen graphics layer
+let pathOpacitySlider;
 
 let dampingValue = 0.7;
 let lastClearTime = 0; // Store the last time the background was cleared
@@ -115,7 +117,7 @@ function draw() {
       let cumulativeEffectY = 0;
       let scaleFactor = 1;
 
-      // Apply attraction points' influence (unchanged)
+      // Apply attraction points' influence
       for (let point of attractionPoints) {
         let distance = dist(point.x, point.y, targetX, targetY);
 
@@ -136,6 +138,30 @@ function draw() {
 
           cumulativeEffectX += dx * distanceFactor;
           cumulativeEffectY += dy * distanceFactor;
+        }
+      }
+
+      // Apply motion-stopping circles' damping effect
+      let damping = dampingValue; // Use global damping value
+      for (let circle of motionStoppingCircles) {
+        let distToCircle = dist(
+          circle.x,
+          circle.y,
+          targetX + baseSliceWidth / 2,
+          targetY + baseSliceHeight / 2
+        );
+
+        if (distToCircle < circle.slider.value()) {
+          let dampingFactor = map(
+            distToCircle,
+            0,
+            circle.slider.value(),
+            0,
+            damping
+          );
+
+          cumulativeEffectX *= dampingFactor;
+          cumulativeEffectY *= dampingFactor;
         }
       }
 
@@ -172,9 +198,10 @@ function draw() {
 
       push();
       translate(
-        animatedPositions[index].x + finalSliceWidth / 2,
-        animatedPositions[index].y + finalSliceHeight / 2
+        animatedPositions[index].x + baseSliceWidth / 2,
+        animatedPositions[index].y + baseSliceHeight / 2
       );
+      scale(scaleFactor); // Apply scale visually
       imageMode(CENTER);
       copy(
         img,
@@ -184,8 +211,8 @@ function draw() {
         baseSliceHeight,
         0,
         0,
-        finalSliceWidth,
-        finalSliceHeight
+        baseSliceWidth,
+        baseSliceHeight
       );
       pop();
 
