@@ -45,6 +45,12 @@ function setup() {
     .addEventListener("click", toggleOpacity);
 
   document.getElementById("clear-button").addEventListener("click", clearAll);
+  document
+    .getElementById("delete-button")
+    .addEventListener("click", (event) => {
+      event.stopPropagation(); // Prevent canvas interaction
+      deleteSelected();
+    });
 
   sliceSlider = select("#slice-slider");
   radiusSlider = select("#radius-slider");
@@ -441,53 +447,85 @@ function clearAll() {
   sliders.forEach((slider) => slider.remove());
 }
 
-function mousePressed() {
-  let foundItem = false; // Flag to track if an item was found
-
-  // Clear previous selection and dragging variables
-  selectedItem = null;
-  isDragging = null;
-  draggingCircle = null;
-  draggingScalePoint = null;
-
-  // Check for attraction points
-  attractionPoints.forEach((point, i) => {
-    console.log(`Checking attraction point ${i} at (${point.x}, ${point.y})`);
-    if (dist(mouseX, mouseY, point.x, point.y) < 10) {
-      selectedItem = { item: point, type: "attraction" };
-      isDragging = i;
-      foundItem = true;
+function deleteSelected() {
+  if (selectedItem) {
+    // Find and remove the selected item from the respective array
+    if (selectedItem.type === "attraction") {
+      attractionPoints = attractionPoints.filter(
+        (p) => p !== selectedItem.item
+      );
+    } else if (selectedItem.type === "circle") {
+      motionStoppingCircles = motionStoppingCircles.filter(
+        (c) => c !== selectedItem.item
+      );
+    } else if (selectedItem.type === "scaling") {
+      scalingPoints = scalingPoints.filter((p) => p !== selectedItem.item);
     }
-  });
 
-  // Check for motion-stopping circles
-  motionStoppingCircles.forEach((circle, i) => {
-    console.log(`Checking circle ${i} at (${circle.x}, ${circle.y})`);
-    if (dist(mouseX, mouseY, circle.x, circle.y) < circle.slider.value()) {
-      selectedItem = { item: circle, type: "circle" };
-      draggingCircle = i;
-      foundItem = true;
+    // Remove the slider associated with the selected item
+    if (selectedItem.item.slider) {
+      selectedItem.item.slider.remove();
     }
-  });
 
-  // Check for scaling points
-  scalingPoints.forEach((point, i) => {
-    console.log(`Checking scaling point ${i} at (${point.x}, ${point.y})`);
-    if (dist(mouseX, mouseY, point.x, point.y) < 10) {
-      selectedItem = { item: point, type: "scaling" };
-      draggingScalePoint = i;
-      foundItem = true;
-    }
-  });
-
-  // If no item is found, clear the selection
-  if (!foundItem) {
-    selectedItem = null;
+    selectedItem = null; // Clear the selection after deletion
+    console.log("Item deleted successfully.");
+  } else {
+    console.log("No item selected to delete.");
   }
+}
 
-  // Log the selected item and mouse position for debugging
-  console.log("Mouse clicked at:", mouseX, mouseY);
-  console.log("Mouse pressed. Selected item:", selectedItem);
+function mousePressed(event) {
+  // Only proceed if the mouse is inside the canvas and not over a control panel element
+  if (
+    mouseX > 0 &&
+    mouseX < width &&
+    mouseY > 0 &&
+    mouseY < height &&
+    !event.target.closest("#control-panel") // Ignore clicks on the control panel
+  ) {
+    let foundItem = false;
+
+    // Clear dragging variables
+    isDragging = null;
+    draggingCircle = null;
+    draggingScalePoint = null;
+
+    // Check for attraction points
+    attractionPoints.forEach((point, i) => {
+      if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+        selectedItem = { item: point, type: "attraction" };
+        isDragging = i;
+        foundItem = true;
+      }
+    });
+
+    // Check for motion-stopping circles
+    motionStoppingCircles.forEach((circle, i) => {
+      if (dist(mouseX, mouseY, circle.x, circle.y) < circle.slider.value()) {
+        selectedItem = { item: circle, type: "circle" };
+        draggingCircle = i;
+        foundItem = true;
+      }
+    });
+
+    // Check for scaling points
+    scalingPoints.forEach((point, i) => {
+      if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+        selectedItem = { item: point, type: "scaling" };
+        draggingScalePoint = i;
+        foundItem = true;
+      }
+    });
+
+    // Only reset selectedItem if nothing was found
+    if (!foundItem) {
+      selectedItem = null;
+    }
+
+    // Log the selected item and mouse position for debugging
+    console.log("Mouse clicked at:", mouseX, mouseY);
+    console.log("Mouse pressed. Selected item:", selectedItem);
+  }
 }
 
 console.log("Selected Item Reference:", selectedItem);
