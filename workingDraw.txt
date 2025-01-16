@@ -1,0 +1,209 @@
+function draw() {
+  background(bgColorPicker.value());
+
+  let spectrum = fft.analyze();
+  if (previousSpectrum.length === 0) {
+    previousSpectrum = spectrum.slice();
+  }
+
+  let alpha = 0.3;
+  for (let i = 0; i < spectrum.length; i++) {
+    previousSpectrum[i] =
+      alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
+  }
+  let smoothSpectrum = previousSpectrum;
+
+  let numSlices = sliceSlider.value();
+  let baseSliceWidth = img.width / numSlices;
+  let baseSliceHeight = img.height / numSlices;
+  let pathLength = pathLengthSlider.value(); // Get path length from slider
+
+  if (originalPositions.length !== numSlices * numSlices) {
+    originalPositions = [];
+    animatedPositions = [];
+    pathHistories = [];
+    let imgX = (width - img.width) / 2;
+    let imgY = (height - img.height) / 2;
+
+    for (let y = 0; y < numSlices; y++) {
+      for (let x = 0; x < numSlices; x++) {
+        let posX = imgX + x * baseSliceWidth;
+        let posY = imgY + y * baseSliceHeight;
+        originalPositions.push({ x: posX, y: posY });
+        animatedPositions.push({ x: posX, y: posY });
+        pathHistories.push([]); // Initialize empty history for each tile
+      }
+    }
+  }
+
+  let index = 0;
+  for (let y = 0; y < numSlices; y++) {
+    for (let x = 0; x < numSlices; x++) {
+      let targetX = originalPositions[index].x;
+      let targetY = originalPositions[index].y;
+
+      let cumulativeEffectX = 0;
+      let cumulativeEffectY = 0;
+      let scaleFactor = 1;
+
+      // Apply attraction points' influence
+      for (let point of attractionPoints) {
+        let distance = dist(point.x, point.y, targetX, targetY);
+
+        if (distance < radiusSlider.value()) {
+          let distanceFactor = map(distance, 0, radiusSlider.value(), 10, 0.1);
+          let intensity = map(
+            smoothSpectrum[
+              floor(map(distance, 0, width, 0, smoothSpectrum.length))
+            ],
+            0,
+            255,
+            0,
+            point.slider.value()
+          );
+
+          let dx = (point.x - targetX) * 0.002 * intensity;
+          let dy = (point.y - targetY) * 0.002 * intensity;
+
+          cumulativeEffectX += dx * distanceFactor;
+          cumulativeEffectY += dy * distanceFactor;
+        }
+      }
+
+      // Apply motion-stopping circles' damping effect
+      let damping = dampingValue;
+      for (let circle of motionStoppingCircles) {
+        let distToCircle = dist(
+          circle.x,
+          circle.y,
+          targetX + baseSliceWidth / 2,
+          targetY + baseSliceHeight / 2
+        );
+
+        if (distToCircle < circle.slider.value()) {
+          let dampingFactor = map(
+            distToCircle,
+            0,
+            circle.slider.value(),
+            0,
+            damping
+          );
+
+          cumulativeEffectX *= dampingFactor;
+          cumulativeEffectY *= dampingFactor;
+        }
+      }
+
+      // Apply scaling points' influence
+      for (let scalePoint of scalingPoints) {
+        let distance = dist(scalePoint.x, scalePoint.y, targetX, targetY);
+        let scaleRadius = scaleRadiusSlider.value();
+
+        if (distance < scaleRadius) {
+          // Get frequency band index based on distance
+          let freqIndex = floor(
+            map(distance, 0, width, 0, smoothSpectrum.length)
+          );
+          freqIndex = constrain(freqIndex, 0, smoothSpectrum.length - 1);
+
+          // Get the intensity from the audio spectrum
+          let audioIntensity = map(
+            smoothSpectrum[freqIndex],
+            0,
+            255,
+            1,
+            scalePoint.intensitySlider.value()
+          );
+
+          // Calculate scaling factor using both distance and audio intensity
+          let scalingFactor = map(
+            distance,
+            0,
+            scaleRadius,
+            audioIntensity, // Use audio intensity as max scaling
+            0.2 // Min scaling when at the edge of the radius
+          );
+
+          scaleFactor *= scalingFactor;
+        }
+      }
+
+      let finalSliceWidth = baseSliceWidth * scaleFactor;
+      let finalSliceHeight = baseSliceHeight * scaleFactor;
+
+      animatedPositions[index].x = lerp(
+        animatedPositions[index].x,
+        targetX + cumulativeEffectX,
+        0.2
+      );
+      animatedPositions[index].y = lerp(
+        animatedPositions[index].y,
+        targetY + cumulativeEffectY,
+        0.2
+      );
+
+      // Store the current position and scale in the path history
+      if (pathLength > 0) {
+        pathHistories[index].push({
+          x: animatedPositions[index].x + baseSliceWidth / 2,
+          y: animatedPositions[index].y + baseSliceHeight / 2,
+          scale: scaleFactor,
+        });
+
+        // Ensure the path history length matches the path length slider value
+        while (pathHistories[index].length > pathLength) {
+          pathHistories[index].shift();
+        }
+
+        // Draw the path for the current tile
+        for (let i = 0; i < pathHistories[index].length; i++) {
+          let pos = pathHistories[index][i];
+          let opacity = map(i, 0, pathHistories[index].length, 50, 255); // Gradual fade
+          push();
+          translate(pos.x, pos.y);
+          scale(pos.scale);
+          tint(255, opacity); // Apply fading effect
+          imageMode(CENTER);
+          copy(
+            img,
+            x * baseSliceWidth,
+            y * baseSliceHeight,
+            baseSliceWidth,
+            baseSliceHeight,
+            0,
+            0,
+            baseSliceWidth,
+            baseSliceHeight
+          );
+          pop();
+        }
+      }
+
+      // Draw the current tile at its animated position
+      push();
+      translate(
+        animatedPositions[index].x + finalSliceWidth / 2,
+        animatedPositions[index].y + finalSliceHeight / 2
+      );
+      imageMode(CENTER);
+      copy(
+        img,
+        x * baseSliceWidth,
+        y * baseSliceHeight,
+        baseSliceWidth,
+        baseSliceHeight,
+        0,
+        0,
+        finalSliceWidth,
+        finalSliceHeight
+      );
+      pop();
+
+      index++;
+    }
+  }
+
+  drawAttractionPoints();
+  drawMotionStoppingCircles();
+  drawScalingPoints();
+}
