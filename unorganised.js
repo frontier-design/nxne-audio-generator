@@ -328,41 +328,7 @@ function handleImageUpload(event) {
   let file = event.target.files[0];
   if (file && file.type.startsWith("image")) {
     img = loadImage(URL.createObjectURL(file), () => {
-      // Force recalculation of the slicing logic
-      let numSlices = sliceSlider.value();
-
-      let maxDimension = 700;
-      let scaleFactor = Math.min(
-        1,
-        maxDimension / img.width,
-        maxDimension / img.height
-      );
-
-      let displayWidth = img.width * scaleFactor;
-      let displayHeight = img.height * scaleFactor;
-
-      let baseSliceWidth = Math.round(displayWidth / numSlices);
-      let baseSliceHeight = Math.round(displayHeight / numSlices);
-
-      displayWidth = baseSliceWidth * numSlices;
-      displayHeight = baseSliceHeight * numSlices;
-
-      let imgTopLeftX = (width - displayWidth) / 2;
-      let imgTopLeftY = (height - displayHeight) / 2;
-
-      originalPositions = [];
-      animatedPositions = [];
-      pathHistories = [];
-
-      for (let y = 0; y < numSlices; y++) {
-        for (let x = 0; x < numSlices; x++) {
-          let posX = imgTopLeftX + x * baseSliceWidth;
-          let posY = imgTopLeftY + y * baseSliceHeight;
-          originalPositions.push({ x: posX, y: posY });
-          animatedPositions.push({ x: posX, y: posY });
-          pathHistories.push([]);
-        }
-      }
+      // No resizing if the image is already smaller than 900 pixels
     });
   }
 }
