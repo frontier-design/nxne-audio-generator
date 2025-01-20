@@ -680,3 +680,9 @@ function mouseReleased() {
   draggingCircle = null;
   draggingScalePoint = null;
 }
+
+function keyPressed() {
+  if (key === "s" || key === "S") {
+    saveCanvas("NXNE_Sketch", "jpg");
+  }
+}
