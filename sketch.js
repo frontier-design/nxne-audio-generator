@@ -34,7 +34,7 @@ let circleIndex = 1;
 let scalingIndex = 1;
 
 function preload() {
-  img = loadImage("assets/images/runTheJewel.png");
+  img = loadImage("assets/images/murathanE.png");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
 }
 
@@ -123,22 +123,11 @@ function draw() {
   let imgTopLeftX = (width - displayWidth) / 2;
   let imgTopLeftY = (height - displayHeight) / 2;
 
-  // stroke(255, 0, 0);
-  noFill();
-  rect(imgTopLeftX, imgTopLeftY, displayWidth, displayHeight);
-
-  // stroke(0, 255, 0, 100);
-  for (let i = 0; i <= numSlices; i++) {
-    let x = imgTopLeftX + i * baseSliceWidth;
-    let y = imgTopLeftY + i * baseSliceHeight;
-    line(x, imgTopLeftY, x, imgTopLeftY + displayHeight);
-    line(imgTopLeftX, y, imgTopLeftX + displayWidth, y);
-  }
-
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
     pathHistories = [];
+    colorPathHistories = []; // Separate path history for the color layer
 
     for (let y = 0; y < numSlices; y++) {
       for (let x = 0; x < numSlices; x++) {
@@ -147,6 +136,7 @@ function draw() {
         originalPositions.push({ x: posX, y: posY });
         animatedPositions.push({ x: posX, y: posY });
         pathHistories.push([]);
+        colorPathHistories.push([]); // Initialize for the color layer
       }
     }
   }
@@ -163,6 +153,11 @@ function draw() {
       let cumulativeEffectY = 0;
       let sliceScaleFactor = 1;
 
+      // Amplified reaction logic for the color layer
+      let colorEffectX = 0;
+      let colorEffectY = 0;
+      let colorScaleFactor = 1;
+
       for (let point of attractionPoints) {
         let distance = dist(point.x, point.y, targetX, targetY);
         if (distance < radiusSlider.value()) {
@@ -176,11 +171,17 @@ function draw() {
             0,
             point.slider.value()
           );
+
+          // Regular effect for the image layer
           let dx = (point.x - targetX) * 0.002 * intensity;
           let dy = (point.y - targetY) * 0.002 * intensity;
 
           cumulativeEffectX += dx * distanceFactor;
           cumulativeEffectY += dy * distanceFactor;
+
+          // Amplified effect for the color layer
+          colorEffectX += dx * distanceFactor * 2;
+          colorEffectY += dy * distanceFactor * 2;
         }
       }
 
@@ -200,8 +201,14 @@ function draw() {
             0,
             dampingValue
           );
+
+          // Regular damping for the image layer
           cumulativeEffectX *= dampingFactor;
           cumulativeEffectY *= dampingFactor;
+
+          // Slightly different damping for the color layer
+          colorEffectX *= dampingFactor * 0.9;
+          colorEffectY *= dampingFactor * 0.9;
         }
       }
 
@@ -232,12 +239,17 @@ function draw() {
           );
 
           sliceScaleFactor *= scalingFactor;
+          colorScaleFactor *= scalingFactor * 1.2; // Amplified scaling for the color layer
         }
       }
 
       let finalSliceWidth = baseSliceWidth * sliceScaleFactor;
       let finalSliceHeight = baseSliceHeight * sliceScaleFactor;
 
+      let finalColorWidth = baseSliceWidth * colorScaleFactor;
+      let finalColorHeight = baseSliceHeight * colorScaleFactor;
+
+      // Update animated positions
       animatedPositions[index].x = lerp(
         animatedPositions[index].x,
         targetX + cumulativeEffectX,
@@ -249,7 +261,18 @@ function draw() {
         0.2
       );
 
-      // Store the path history
+      let colorX = lerp(
+        animatedPositions[index].x,
+        targetX + colorEffectX,
+        0.2
+      );
+      let colorY = lerp(
+        animatedPositions[index].y,
+        targetY + colorEffectY,
+        0.2
+      );
+
+      // Store the path history for the image layer
       if (pathLength > 0) {
         pathHistories[index].push({
           x: animatedPositions[index].x,
@@ -261,35 +284,36 @@ function draw() {
         while (pathHistories[index].length > pathLength) {
           pathHistories[index].shift();
         }
+      }
 
-        // Draw the path
-        for (let i = 0; i < pathHistories[index].length; i++) {
-          let pos = pathHistories[index][i];
-          push();
-          translate(pos.x + baseSliceWidth / 2, pos.y + baseSliceHeight / 2);
-          scale(pos.scale);
-          imageMode(CENTER);
+      // Store the path history for the color layer
+      if (pathLength > 0) {
+        colorPathHistories[index].push({
+          x: colorX,
+          y: colorY,
+          scale: colorScaleFactor,
+        });
 
-          let originalSliceWidth = Math.round(img.width / numSlices);
-          let originalSliceHeight = Math.round(img.height / numSlices);
-
-          copy(
-            img,
-            x * originalSliceWidth,
-            y * originalSliceHeight,
-            originalSliceWidth,
-            originalSliceHeight,
-            -baseSliceWidth / 2,
-            -baseSliceHeight / 2,
-            baseSliceWidth,
-            baseSliceHeight
-          );
-
-          pop();
+        // Limit the history length to the specified pathLength
+        while (colorPathHistories[index].length > pathLength) {
+          colorPathHistories[index].shift();
         }
       }
 
-      // Draw the current slice
+      // Draw the color layer slice (path history)
+      for (let i = 0; i < colorPathHistories[index].length; i++) {
+        let pos = colorPathHistories[index][i];
+        push();
+        translate(pos.x + baseSliceWidth / 2, pos.y + baseSliceHeight / 2);
+        scale(pos.scale);
+        rectMode(CENTER);
+        fill(0, 255, 0); // Bright green
+        noStroke();
+        rect(0, 0, finalColorWidth, finalColorHeight);
+        pop();
+      }
+
+      // Draw the current image slice
       push();
       translate(
         animatedPositions[index].x + baseSliceWidth / 2,
@@ -433,7 +457,6 @@ function addMotionStoppingCircle() {
     label: circleIndex,
   };
 
-  // Create a container for the slider and its label
   let sliderContainer = createDiv();
   sliderContainer.style("display", "flex");
   sliderContainer.style("align-items", "center");
