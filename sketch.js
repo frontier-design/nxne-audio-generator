@@ -1,118 +1,560 @@
-let img;
-let song;
-let fft;
-let playButton;
-let sliceSlider;
-let dampingSlider;
-let addPointButton;
-let addCircleButton;
-let addScalePointButton;
-let scaleRadiusSlider;
-let radiusSlider;
-let bgColorPicker;
-let pathLengthSlider;
+let visual = {
+  img: null,
+  fft: null,
+  bgColorPicker: null,
+  isOpaque: true,
+};
 
-let attractionPoints = [];
-let scalingPoints = [];
-let motionStoppingCircles = [];
-let originalPositions = [];
-let animatedPositions = [];
-let previousSpectrum = [];
-let interactions = [];
-let pathHistories = [];
+let audio = {
+  song: null,
+  youtubePlayer: null,
+  youtubeAudioLoaded: false,
+  videoElement: null,
+  isVideoLoaded: false,
+  isPlaying: false,
+};
 
-let isDragging = null;
-let draggingCircle = null;
-let draggingScalePoint = null;
-let selectedItem = null;
-let isOpaque = true;
+let controls = {
+  playButton: null,
+  sliceSlider: null,
+  dampingSlider: null,
+  scaleRadiusSlider: null,
+  radiusSlider: null,
+  pathLengthSlider: null,
+  addPointButton: null,
+  addCircleButton: null,
+  addScalePointButton: null,
+};
 
-let dampingValue = 0.7;
-let lastClearTime = 0;
-let attractionIndex = 1;
-let circleIndex = 1;
-let scalingIndex = 1;
+let points = {
+  attractionPoints: [],
+  motionStoppingCircles: [],
+  scalingPoints: [],
+  pathHistories: [],
+  colorPathHistories: [],
+};
+
+let state = {
+  originalPositions: [],
+  animatedPositions: [],
+  previousSpectrum: [],
+  interactions: [],
+  isDragging: null,
+  draggingCircle: null,
+  draggingScalePoint: null,
+  selectedItem: null,
+};
+
+let indices = {
+  attractionIndex: 1,
+  circleIndex: 1,
+  scalingIndex: 1,
+};
+
+let recording = {
+  capture: null,
+  isRecording: false,
+};
+
+let constants = {
+  dampingValue: 0.7,
+  maxDimension: 700,
+};
+
+let debug = {
+  lastClearTime: 0,
+};
+
+function extractYouTubeID(url) {
+  const regExp = /^.*(?:youtu\.be\/|v\/|embed\/|watch\?v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[1].length === 11 ? match[1] : null;
+}
 
 function preload() {
-  img = loadImage("assets/images/murathanE.png");
-  song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
+  visual.img = loadImage(
+    "assets/images/murathanE.png",
+    () => {
+      console.log("Image loaded successfully");
+    },
+    () => {
+      console.error("Failed to load the image");
+    }
+  );
+  audio.song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  fft = new p5.FFT();
+  frameRate(60);
 
-  playButton = select("#play-button");
-  playButton.mousePressed(togglePlay);
-  document
-    .getElementById("toggle-opacity-button")
-    .addEventListener("click", toggleOpacity);
+  visual.fft = new p5.FFT();
 
-  document.getElementById("clear-button").addEventListener("click", clearAll);
-  document
-    .getElementById("delete-button")
-    .addEventListener("click", (event) => {
-      event.stopPropagation();
-      deleteSelected();
-    });
+  controls.playButton = select("#play-button");
+  controls.playButton.mousePressed(togglePlay);
 
-  sliceSlider = select("#slice-slider");
-  radiusSlider = select("#radius-slider");
-  scaleRadiusSlider = select("#scale-radius-slider");
-  dampingSlider = select("#damping-slider");
-  dampingSlider.input(() => {
-    dampingValue = float(dampingSlider.value());
-  });
+  select("#start-recording").mousePressed(startRecording);
+  select("#stop-recording").mousePressed(stopRecording);
 
-  pathLengthSlider = select("#path-length-slider");
+  select("#audio-input").changed(handleAudioUpload);
+  // select("#video-input").changed(handleVideoUpload);
+  // select("#youtube-load-button").mousePressed(loadYouTubeAudio);
 
-  addPointButton = select("#add-point-button");
-  addPointButton.mousePressed(addAttractionPoint);
-
-  addCircleButton = select("#add-circle-button");
-  addCircleButton.mousePressed(addMotionStoppingCircle);
-
-  addScalePointButton = select("#add-scale-point-button");
-  addScalePointButton.mousePressed(addScalingPoint);
-
-  bgColorPicker = select("#bg-color-picker");
-
-  imageInput = select("#image-input");
-  imageInput.changed(handleImageUpload);
-
-  audioInput = select("#audio-input");
-  audioInput.changed(handleAudioUpload);
-
-  addAttractionPoint();
+  initializeControls();
+  addAttractionPoint(); // Add initial attraction point
   imageMode(CENTER);
 }
 
 function draw() {
-  background(bgColorPicker.value());
+  background(visual.bgColorPicker?.value() || "#000000");
 
-  let spectrum = fft.analyze();
-  if (previousSpectrum.length === 0) {
-    previousSpectrum = spectrum.slice();
+  // Draw the image if it exists
+  if (visual.img) {
+    imageMode(CENTER);
+    image(
+      visual.img,
+      width / 2,
+      height / 2,
+      visual.img.width,
+      visual.img.height
+    );
   }
 
-  let alpha = 0.3;
+  // Analyze the audio spectrum
+  let spectrum = visual.fft.analyze();
+  state.previousSpectrum = smoothSpectrum(spectrum);
+
+  // Process visual effects
+  processVisualEffects();
+
+  // Draw the attraction points, circles, and scaling points
+  drawAttractionPoints();
+  drawMotionStoppingCircles();
+  drawScalingPoints();
+
+  // Recording process
+  if (recording.isRecording && recording.capture) {
+    try {
+      recording.capture.capture(document.querySelector("canvas"));
+    } catch (error) {
+      console.error("Error during capture:", error);
+    }
+  }
+}
+
+function startRecording() {
+  if (!recording.isRecording) {
+    recording.capture = new CCapture({
+      format: "webm",
+      framerate: 30,
+      verbose: true, // Enables logging for debugging
+      quality: 100, // High-quality output
+      autoSaveTime: 0, // Avoid premature saving
+    });
+
+    frameRate(30); // Lock frame rate for consistent recording
+    recording.capture.start();
+    recording.isRecording = true;
+    console.log("Recording started...");
+  }
+}
+
+function stopRecording() {
+  if (recording.isRecording) {
+    console.log("Finalizing recording...");
+    recording.capture.stop();
+    setTimeout(() => {
+      try {
+        recording.capture.save(); // Save recording after a delay
+        console.log("Recording saved.");
+      } catch (error) {
+        console.error("Error during saving:", error);
+      }
+    }, 100); // Allow time for processing
+    recording.isRecording = false;
+    frameRate(60); // Restore frame rate after recording
+  }
+}
+
+function smoothSpectrum(spectrum) {
+  if (state.previousSpectrum.length === 0) {
+    state.previousSpectrum = spectrum.slice();
+  }
+
+  let alpha = 0.3; // Smoothing factor
   for (let i = 0; i < spectrum.length; i++) {
-    previousSpectrum[i] =
-      alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
+    state.previousSpectrum[i] =
+      alpha * spectrum[i] + (1 - alpha) * state.previousSpectrum[i];
   }
-  let smoothSpectrum = previousSpectrum;
+  return state.previousSpectrum;
+}
 
-  let numSlices = sliceSlider.value();
+function handleImageUpload(event) {
+  let file = event.target.files[0];
+  if (file && file.type.startsWith("image")) {
+    visual.img = loadImage(URL.createObjectURL(file), () => {
+      let numSlices = controls.sliceSlider.value();
 
-  let maxDimension = 700;
+      let maxDimension = 700;
+      let scaleFactor = Math.min(
+        1,
+        maxDimension / visual.img.width,
+        maxDimension / visual.img.height
+      );
+
+      let displayWidth = visual.img.width * scaleFactor;
+      let displayHeight = visual.img.height * scaleFactor;
+
+      let baseSliceWidth = Math.round(displayWidth / numSlices);
+      let baseSliceHeight = Math.round(displayHeight / numSlices);
+
+      displayWidth = baseSliceWidth * numSlices;
+      displayHeight = baseSliceHeight * numSlices;
+
+      let imgTopLeftX = (width - displayWidth) / 2;
+      let imgTopLeftY = (height - displayHeight) / 2;
+
+      state.originalPositions = [];
+      state.animatedPositions = [];
+      state.pathHistories = [];
+
+      for (let y = 0; y < numSlices; y++) {
+        for (let x = 0; x < numSlices; x++) {
+          let posX = imgTopLeftX + x * baseSliceWidth;
+          let posY = imgTopLeftY + y * baseSliceHeight;
+          state.originalPositions.push({ x: posX, y: posY });
+          state.animatedPositions.push({ x: posX, y: posY });
+          state.pathHistories.push([]);
+        }
+      }
+    });
+  }
+}
+
+function handleAudioUpload(event) {
+  const file = event.target.files[0];
+  if (file && file.type.startsWith("audio")) {
+    if (audio.song) {
+      audio.song.stop();
+    }
+    audio.song = loadSound(URL.createObjectURL(file), () => {
+      visual.fft = new p5.FFT();
+      audio.isPlaying = false;
+      document.getElementById("play-button").innerText = "Play";
+    });
+  }
+}
+
+// function handleVideoUpload(event) {
+//   const file = event.target.files[0];
+//   if (file && file.type.startsWith("video")) {
+//     const url = URL.createObjectURL(file);
+//     videoElement = createVideo(url, () => {
+//       videoElement.hide();
+//       fft = new p5.FFT();
+//     });
+//     videoElement.volume(1);
+//   }
+// }
+
+// function onVideoLoaded() {
+//   video.loop();
+//   isVideoLoaded = true;
+//   console.log("Video loaded successfully");
+// }
+
+// function loadYouTubeAudio() {
+//   const urlInput = document.getElementById("youtube-url").value;
+
+//   if (!urlInput) {
+//     alert("Please enter a YouTube URL.");
+//     return;
+//   }
+
+//   const videoId = extractYouTubeID(urlInput);
+//   if (!videoId) {
+//     alert("Invalid YouTube URL.");
+//     return;
+//   }
+
+//   const youtubePlayerElement = document.getElementById("youtube-player");
+//   youtubePlayerElement.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${location.origin}`;
+
+//   youtubeAudioLoaded = true;
+//   isPlaying = false;
+//   document.getElementById("play-button").innerText = "Play";
+
+//   youtubePlayer = new YT.Player("youtube-player", {
+//     events: {
+//       onReady: () => {
+//         alert("YouTube video loaded successfully!");
+//         console.log("YouTube Player Loaded");
+//       },
+//       onStateChange: (event) => {
+//         if (event.data === YT.PlayerState.PLAYING) {
+//           isPlaying = true;
+//           document.getElementById("play-button").innerText = "Stop";
+//         } else if (
+//           event.data === YT.PlayerState.PAUSED ||
+//           event.data === YT.PlayerState.ENDED
+//         ) {
+//           isPlaying = false;
+//           document.getElementById("play-button").innerText = "Play";
+//         }
+//       },
+//       onError: (error) => {
+//         console.error("YouTube Player Error:", error);
+//       },
+//     },
+//   });
+// }
+
+// function setupYouTubeAudio(videoId) {
+//   const audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
+//   const hiddenAudioElement = createAudio(audioUrl);
+//   hiddenAudioElement.id("youtube-audio");
+//   hiddenAudioElement.hide();
+//   hiddenAudioElement.loop(false);
+
+//   hiddenAudioElement.play();
+//   fft.setInput(hiddenAudioElement);
+// }
+
+function togglePlay() {
+  if (recording.isRecording) {
+    console.log("Recording in progress... Ensure playback is synced.");
+  }
+
+  if (audio.youtubeAudioLoaded && audio.youtubePlayer) {
+    if (!audio.isPlaying) {
+      audio.youtubePlayer.playVideo();
+      audio.isPlaying = true;
+      document.getElementById("play-button").innerText = "Stop";
+    } else {
+      audio.youtubePlayer.pauseVideo();
+      audio.isPlaying = false;
+      document.getElementById("play-button").innerText = "Play";
+    }
+  } else if (audio.song && audio.song.isPlaying()) {
+    audio.song.stop();
+    audio.isPlaying = false;
+    document.getElementById("play-button").innerText = "Play";
+  } else if (audio.song) {
+    audio.song.loop();
+    audio.isPlaying = true;
+    document.getElementById("play-button").innerText = "Stop";
+  } else if (video.isLoaded && video.element) {
+    if (!audio.isPlaying) {
+      video.element.play();
+      audio.isPlaying = true;
+      document.getElementById("play-button").innerText = "Stop";
+    } else {
+      video.element.pause();
+      audio.isPlaying = false;
+      document.getElementById("play-button").innerText = "Play";
+    }
+  } else {
+    alert(
+      "No audio source loaded. Please upload an audio file or load a YouTube video."
+    );
+  }
+}
+
+function toggleOpacity() {
+  state.isOpaque = !state.isOpaque;
+  console.log(`Opacity toggled: ${state.isOpaque ? "Opaque" : "Transparent"}`);
+}
+
+function addAttractionPoint() {
+  let newPoint = {
+    x: width / 2,
+    y: height / 2,
+    slider: createSlider(0, 500, 250),
+    label: indices.attractionIndex,
+  };
+
+  let sliderContainer = createDiv();
+  sliderContainer.style("display", "flex");
+  sliderContainer.style("align-items", "center");
+
+  let sliderLabel = createDiv(`A${indices.attractionIndex}`);
+  sliderLabel.style("color", "red");
+  sliderLabel.style("margin-left", "8px");
+  sliderLabel.style("background-color", "rgba(255, 0, 0, 0.3)");
+  sliderLabel.style("padding", "1px 3px");
+
+  newPoint.slider.parent(sliderContainer);
+  sliderLabel.parent(sliderContainer);
+  sliderContainer.parent(document.getElementById("intensity-panel"));
+
+  points.attractionPoints.push(newPoint);
+  indices.attractionIndex++;
+}
+
+function addMotionStoppingCircle() {
+  let newCircle = {
+    x: random(width),
+    y: random(height),
+    slider: createSlider(50, 300, 150),
+    label: state.circleIndex,
+  };
+
+  let sliderContainer = createDiv();
+  sliderContainer.style("display", "flex");
+  sliderContainer.style("align-items", "center");
+
+  let sliderLabel = createDiv(`C${state.circleIndex}`);
+  sliderLabel.style("color", "rgb(0,255,0)");
+  sliderLabel.style("margin-left", "8px");
+  sliderLabel.style("margin-top", "-15px");
+  sliderLabel.style("background-color", "rgba(0, 255, 0, 0.3)");
+  sliderLabel.style("padding", "1px 3px");
+
+  newCircle.slider.parent(sliderContainer);
+  sliderLabel.parent(sliderContainer);
+  sliderContainer.parent(document.getElementById("intensity-panel"));
+
+  visual.motionStoppingCircles.push(newCircle);
+  state.circleIndex++;
+}
+
+function addScalingPoint() {
+  let newPoint = {
+    x: width / 3,
+    y: height / 3,
+    intensitySlider: createSlider(0.5, 10, 1, 0.1),
+    label: state.scalingIndex,
+  };
+
+  let sliderContainer = createDiv();
+  sliderContainer.style("display", "flex");
+  sliderContainer.style("align-items", "center");
+
+  let sliderLabel = createDiv(`S${state.scalingIndex}`);
+  sliderLabel.style("color", "magenta");
+  sliderLabel.style("margin-left", "8px");
+  sliderLabel.style("margin-top", "-15px");
+  sliderLabel.style("background-color", "rgba(255, 0, 255, 0.3)");
+  sliderLabel.style("padding", "1px 3px");
+
+  newPoint.intensitySlider.parent(sliderContainer);
+  sliderLabel.parent(sliderContainer);
+  sliderContainer.parent(document.getElementById("intensity-panel"));
+
+  visual.scalingPoints.push(newPoint);
+  state.scalingIndex++;
+}
+
+function drawAttractionPoints() {
+  for (let point of points.attractionPoints) {
+    if (visual.isOpaque) {
+      fill("red");
+    } else {
+      noFill();
+    }
+    noStroke();
+    ellipse(point.x, point.y, 10);
+
+    if (visual.isOpaque) {
+      textSize(12);
+      textAlign(CENTER, CENTER);
+      fill("white");
+      text(`A${point.label}`, point.x - 15, point.y - 15);
+    }
+  }
+}
+
+function drawMotionStoppingCircles() {
+  for (let circle of points.motionStoppingCircles) {
+    if (visual.isOpaque) {
+      fill("rgba(0, 255, 0, 0.3)");
+    } else {
+      noFill();
+    }
+    ellipse(circle.x, circle.y, circle.slider.value() * 2);
+
+    if (visual.isOpaque) {
+      textSize(12);
+      textAlign(CENTER, CENTER);
+      fill("white");
+      text(`C${circle.label}`, circle.x - 15, circle.y - 15);
+    }
+  }
+}
+
+function drawScalingPoints() {
+  for (let point of points.scalingPoints) {
+    if (visual.isOpaque) {
+      fill("magenta");
+    } else {
+      noFill();
+    }
+    ellipse(point.x, point.y, 10);
+
+    if (visual.isOpaque) {
+      textSize(12);
+      textAlign(CENTER, CENTER);
+      fill("white");
+      text(`S${point.label}`, point.x - 15, point.y - 15);
+    }
+  }
+}
+
+function clearAll() {
+  visual.attractionPoints.forEach((point) => {
+    point.slider.parent().remove();
+  });
+
+  visual.motionStoppingCircles.forEach((circle) => {
+    circle.slider.parent().remove();
+  });
+
+  visual.scalingPoints.forEach((point) => {
+    point.intensitySlider.parent().remove();
+  });
+
+  visual.attractionPoints = [];
+  visual.motionStoppingCircles = [];
+  visual.scalingPoints = [];
+  state.selectedItem = null;
+}
+
+function deleteSelected() {
+  if (state.selectedItem) {
+    if (state.selectedItem.type === "attraction") {
+      state.selectedItem.item.slider.parent().remove();
+
+      visual.attractionPoints = visual.attractionPoints.filter(
+        (p) => p !== state.selectedItem.item
+      );
+    } else if (state.selectedItem.type === "circle") {
+      state.selectedItem.item.slider.parent().remove();
+
+      visual.motionStoppingCircles = visual.motionStoppingCircles.filter(
+        (c) => c !== state.selectedItem.item
+      );
+    } else if (state.selectedItem.type === "scaling") {
+      state.selectedItem.item.intensitySlider.parent().remove();
+
+      visual.scalingPoints = visual.scalingPoints.filter(
+        (p) => p !== state.selectedItem.item
+      );
+    }
+
+    state.selectedItem = null;
+  }
+}
+
+function processVisualEffects() {
+  let numSlices = controls.sliceSlider.value();
   let scaleFactor = Math.min(
     1,
-    maxDimension / img.width,
-    maxDimension / img.height
+    constants.maxDimension / visual.img.width,
+    constants.maxDimension / visual.img.height
   );
 
-  let displayWidth = img.width * scaleFactor;
-  let displayHeight = img.height * scaleFactor;
+  let displayWidth = visual.img.width * scaleFactor;
+  let displayHeight = visual.img.height * scaleFactor;
 
   let baseSliceWidth = Math.round(displayWidth / numSlices);
   let baseSliceHeight = Math.round(displayHeight / numSlices);
@@ -123,48 +565,53 @@ function draw() {
   let imgTopLeftX = (width - displayWidth) / 2;
   let imgTopLeftY = (height - displayHeight) / 2;
 
-  if (originalPositions.length !== numSlices * numSlices) {
-    originalPositions = [];
-    animatedPositions = [];
-    pathHistories = [];
-    colorPathHistories = []; // Separate path history for the color layer
+  if (state.originalPositions.length !== numSlices * numSlices) {
+    state.originalPositions = [];
+    state.animatedPositions = [];
+    points.pathHistories = [];
+    points.colorPathHistories = [];
 
     for (let y = 0; y < numSlices; y++) {
       for (let x = 0; x < numSlices; x++) {
         let posX = imgTopLeftX + x * baseSliceWidth;
         let posY = imgTopLeftY + y * baseSliceHeight;
-        originalPositions.push({ x: posX, y: posY });
-        animatedPositions.push({ x: posX, y: posY });
-        pathHistories.push([]);
-        colorPathHistories.push([]); // Initialize for the color layer
+        state.originalPositions.push({ x: posX, y: posY });
+        state.animatedPositions.push({ x: posX, y: posY });
+        points.pathHistories.push([]);
+        points.colorPathHistories.push([]);
       }
     }
   }
 
-  let pathLength = pathLengthSlider.value();
+  let pathLength = controls.pathLengthSlider.value();
   let index = 0;
 
   for (let y = 0; y < numSlices; y++) {
     for (let x = 0; x < numSlices; x++) {
-      let targetX = originalPositions[index].x;
-      let targetY = originalPositions[index].y;
+      let targetX = state.originalPositions[index].x;
+      let targetY = state.originalPositions[index].y;
 
       let cumulativeEffectX = 0;
       let cumulativeEffectY = 0;
       let sliceScaleFactor = 1;
 
-      // Amplified reaction logic for the color layer
       let colorEffectX = 0;
       let colorEffectY = 0;
       let colorScaleFactor = 1;
 
-      for (let point of attractionPoints) {
+      for (let point of points.attractionPoints) {
         let distance = dist(point.x, point.y, targetX, targetY);
-        if (distance < radiusSlider.value()) {
-          let distanceFactor = map(distance, 0, radiusSlider.value(), 10, 0.1);
+        if (distance < controls.radiusSlider.value()) {
+          let distanceFactor = map(
+            distance,
+            0,
+            controls.radiusSlider.value(),
+            10,
+            0.1
+          );
           let intensity = map(
-            smoothSpectrum[
-              floor(map(distance, 0, width, 0, smoothSpectrum.length))
+            state.previousSpectrum[
+              floor(map(distance, 0, width, 0, state.previousSpectrum.length))
             ],
             0,
             255,
@@ -172,20 +619,18 @@ function draw() {
             point.slider.value()
           );
 
-          // Regular effect for the image layer
           let dx = (point.x - targetX) * 0.002 * intensity;
           let dy = (point.y - targetY) * 0.002 * intensity;
 
           cumulativeEffectX += dx * distanceFactor;
           cumulativeEffectY += dy * distanceFactor;
 
-          // Amplified effect for the color layer
           colorEffectX += dx * distanceFactor * 2;
           colorEffectY += dy * distanceFactor * 2;
         }
       }
 
-      for (let circle of motionStoppingCircles) {
+      for (let circle of points.motionStoppingCircles) {
         let distToCircle = dist(
           circle.x,
           circle.y,
@@ -199,47 +644,14 @@ function draw() {
             0,
             circle.slider.value(),
             0,
-            dampingValue
+            constants.dampingValue
           );
 
-          // Regular damping for the image layer
           cumulativeEffectX *= dampingFactor;
           cumulativeEffectY *= dampingFactor;
 
-          // Slightly different damping for the color layer
           colorEffectX *= dampingFactor * 0.9;
           colorEffectY *= dampingFactor * 0.9;
-        }
-      }
-
-      for (let scalePoint of scalingPoints) {
-        let distance = dist(scalePoint.x, scalePoint.y, targetX, targetY);
-        let scaleRadius = scaleRadiusSlider.value();
-
-        if (distance < scaleRadius) {
-          let freqIndex = floor(
-            map(distance, 0, width, 0, smoothSpectrum.length)
-          );
-          freqIndex = constrain(freqIndex, 0, smoothSpectrum.length - 1);
-
-          let audioIntensity = map(
-            smoothSpectrum[freqIndex],
-            0,
-            255,
-            1,
-            scalePoint.intensitySlider.value()
-          );
-
-          let scalingFactor = map(
-            distance,
-            0,
-            scaleRadius,
-            audioIntensity,
-            0.2
-          );
-
-          sliceScaleFactor *= scalingFactor;
-          colorScaleFactor *= scalingFactor * 1.2; // Amplified scaling for the color layer
         }
       }
 
@@ -249,370 +661,93 @@ function draw() {
       let finalColorWidth = baseSliceWidth * colorScaleFactor;
       let finalColorHeight = baseSliceHeight * colorScaleFactor;
 
-      // Update animated positions
-      animatedPositions[index].x = lerp(
-        animatedPositions[index].x,
+      state.animatedPositions[index].x = lerp(
+        state.animatedPositions[index].x,
         targetX + cumulativeEffectX,
         0.2
       );
-      animatedPositions[index].y = lerp(
-        animatedPositions[index].y,
+      state.animatedPositions[index].y = lerp(
+        state.animatedPositions[index].y,
         targetY + cumulativeEffectY,
         0.2
       );
 
-      let colorX = lerp(
-        animatedPositions[index].x,
-        targetX + colorEffectX,
-        0.2
-      );
-      let colorY = lerp(
-        animatedPositions[index].y,
-        targetY + colorEffectY,
-        0.2
-      );
-
-      // Store the path history for the image layer
-      if (pathLength > 0) {
-        pathHistories[index].push({
-          x: animatedPositions[index].x,
-          y: animatedPositions[index].y,
-          scale: sliceScaleFactor,
-        });
-
-        // Limit the history length to the specified pathLength
-        while (pathHistories[index].length > pathLength) {
-          pathHistories[index].shift();
-        }
-      }
-
-      // Store the path history for the color layer
-      if (pathLength > 0) {
-        colorPathHistories[index].push({
-          x: colorX,
-          y: colorY,
-          scale: colorScaleFactor,
-        });
-
-        // Limit the history length to the specified pathLength
-        while (colorPathHistories[index].length > pathLength) {
-          colorPathHistories[index].shift();
-        }
-      }
-
-      // Draw the color layer slice (path history)
-      for (let i = 0; i < colorPathHistories[index].length; i++) {
-        let pos = colorPathHistories[index][i];
-        push();
-        translate(pos.x + baseSliceWidth / 2, pos.y + baseSliceHeight / 2);
-        scale(pos.scale);
-        rectMode(CENTER);
-        fill(0, 255, 0); // Bright green
-        noStroke();
-        rect(0, 0, finalColorWidth, finalColorHeight);
-        pop();
-      }
-
-      // Draw the current image slice
-      push();
-      translate(
-        animatedPositions[index].x + baseSliceWidth / 2,
-        animatedPositions[index].y + baseSliceHeight / 2
-      );
-      scale(sliceScaleFactor);
-      imageMode(CENTER);
-
-      let originalSliceWidth = Math.round(img.width / numSlices);
-      let originalSliceHeight = Math.round(img.height / numSlices);
-
-      copy(
-        img,
-        x * originalSliceWidth,
-        y * originalSliceHeight,
-        originalSliceWidth,
-        originalSliceHeight,
-        -baseSliceWidth / 2,
-        -baseSliceHeight / 2,
-        baseSliceWidth,
-        baseSliceHeight
-      );
-
-      pop();
-
       index++;
     }
   }
-
-  drawAttractionPoints();
-  drawMotionStoppingCircles();
-  drawScalingPoints();
 }
 
-function handleImageUpload(event) {
-  let file = event.target.files[0];
-  if (file && file.type.startsWith("image")) {
-    img = loadImage(URL.createObjectURL(file), () => {
-      // Force recalculation of the slicing logic
-      let numSlices = sliceSlider.value();
+function initializeControls() {
+  document
+    .getElementById("toggle-opacity-button")
+    .addEventListener("click", toggleOpacity);
 
-      let maxDimension = 700;
-      let scaleFactor = Math.min(
-        1,
-        maxDimension / img.width,
-        maxDimension / img.height
-      );
-
-      let displayWidth = img.width * scaleFactor;
-      let displayHeight = img.height * scaleFactor;
-
-      let baseSliceWidth = Math.round(displayWidth / numSlices);
-      let baseSliceHeight = Math.round(displayHeight / numSlices);
-
-      displayWidth = baseSliceWidth * numSlices;
-      displayHeight = baseSliceHeight * numSlices;
-
-      let imgTopLeftX = (width - displayWidth) / 2;
-      let imgTopLeftY = (height - displayHeight) / 2;
-
-      originalPositions = [];
-      animatedPositions = [];
-      pathHistories = [];
-
-      for (let y = 0; y < numSlices; y++) {
-        for (let x = 0; x < numSlices; x++) {
-          let posX = imgTopLeftX + x * baseSliceWidth;
-          let posY = imgTopLeftY + y * baseSliceHeight;
-          originalPositions.push({ x: posX, y: posY });
-          animatedPositions.push({ x: posX, y: posY });
-          pathHistories.push([]);
-        }
-      }
+  document.getElementById("clear-button").addEventListener("click", clearAll);
+  document
+    .getElementById("delete-button")
+    .addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteSelected();
     });
-  }
-}
 
-function handleAudioUpload(event) {
-  let file = event.target.files[0];
-  if (file && file.type.startsWith("audio")) {
-    if (song.isPlaying()) {
-      song.stop();
-    }
-    song = loadSound(URL.createObjectURL(file), () => {
-      fft = new p5.FFT();
-      document.getElementById("play-button").innerText = "Play";
-    });
+  controls.sliceSlider = select("#slice-slider");
+  if (!controls.sliceSlider) {
+    console.error("Slice slider (#slice-slider) not found!");
   }
-}
 
-function togglePlay() {
-  if (song.isPlaying()) {
-    song.stop();
-    document.getElementById("play-button").innerText = "Play";
+  controls.radiusSlider = select("#radius-slider");
+  if (!controls.radiusSlider) {
+    console.error("Radius slider (#radius-slider) not found!");
+  }
+
+  controls.scaleRadiusSlider = select("#scale-radius-slider");
+  if (!controls.scaleRadiusSlider) {
+    console.error("Scale radius slider (#scale-radius-slider) not found!");
+  }
+
+  controls.dampingSlider = select("#damping-slider");
+  if (!controls.dampingSlider) {
+    console.error("Damping slider (#damping-slider) not found!");
+  }
+
+  controls.pathLengthSlider = select("#path-length-slider");
+  if (!controls.pathLengthSlider) {
+    console.error("Path length slider (#path-length-slider) not found!");
+  }
+
+  controls.addPointButton = select("#add-point-button");
+  if (controls.addPointButton) {
+    controls.addPointButton.mousePressed(addAttractionPoint);
   } else {
-    song.loop();
-    document.getElementById("play-button").innerText = "Stop";
+    console.error("Add point button (#add-point-button) not found!");
   }
-}
 
-function toggleOpacity() {
-  isOpaque = !isOpaque;
-  console.log(`Opacity toggled: ${isOpaque ? "Opaque" : "Transparent"}`);
-}
-
-function addAttractionPoint() {
-  let newPoint = {
-    x: width / 2,
-    y: height / 2,
-    slider: createSlider(0, 500, 250),
-    label: attractionIndex,
-  };
-
-  // Create a container for the slider and its label
-  let sliderContainer = createDiv();
-  sliderContainer.style("display", "flex");
-  sliderContainer.style("align-items", "center");
-
-  // Create the label next to the slider
-  let sliderLabel = createDiv(`A${attractionIndex}`);
-  sliderLabel.style("color", "red");
-  sliderLabel.style("margin-left", "8px");
-  sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(255, 0, 0, 0.3)");
-  sliderLabel.style("padding", "1px 3px");
-
-  newPoint.slider.parent(sliderContainer);
-  sliderLabel.parent(sliderContainer);
-  sliderContainer.parent(document.getElementById("intensity-panel"));
-
-  attractionPoints.push(newPoint);
-  attractionIndex++;
-}
-
-function addMotionStoppingCircle() {
-  let newCircle = {
-    x: random(width),
-    y: random(height),
-    slider: createSlider(50, 300, 150),
-    label: circleIndex,
-  };
-
-  let sliderContainer = createDiv();
-  sliderContainer.style("display", "flex");
-  sliderContainer.style("align-items", "center");
-
-  // Create the label next to the slider
-  let sliderLabel = createDiv(`C${circleIndex}`);
-  sliderLabel.style("color", "rgb(0,255,0)");
-  sliderLabel.style("margin-left", "8px");
-  sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(0, 255, 0, 0.3)");
-  sliderLabel.style("padding", "1px 3px");
-
-  newCircle.slider.parent(sliderContainer);
-  sliderLabel.parent(sliderContainer);
-  sliderContainer.parent(document.getElementById("intensity-panel"));
-
-  motionStoppingCircles.push(newCircle);
-  circleIndex++;
-}
-
-function addScalingPoint() {
-  let newPoint = {
-    x: width / 3,
-    y: height / 3,
-    intensitySlider: createSlider(0.5, 10, 1, 0.1),
-    label: scalingIndex,
-  };
-
-  // Create a container for the slider and its label
-  let sliderContainer = createDiv();
-  sliderContainer.style("display", "flex");
-  sliderContainer.style("align-items", "center");
-
-  // Create the label next to the slider
-  let sliderLabel = createDiv(`S${scalingIndex}`);
-  sliderLabel.style("color", "magenta");
-  sliderLabel.style("margin-left", "8px");
-  sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(255, 0, 255, 0.3)");
-  sliderLabel.style("padding", "1px 3px");
-
-  newPoint.intensitySlider.parent(sliderContainer);
-  sliderLabel.parent(sliderContainer);
-  sliderContainer.parent(document.getElementById("intensity-panel"));
-
-  scalingPoints.push(newPoint);
-  scalingIndex++;
-}
-
-function drawAttractionPoints() {
-  for (let point of attractionPoints) {
-    if (isOpaque) {
-      fill("red");
-    } else {
-      noFill();
-    }
-    noStroke();
-    ellipse(point.x, point.y, 10);
-
-    // Render labels only if isOpaque is true
-    if (isOpaque) {
-      textSize(12);
-      textAlign(CENTER, CENTER);
-      fill("white");
-      text(`A${point.label}`, point.x - 15, point.y - 15);
-    }
+  controls.addCircleButton = select("#add-circle-button");
+  if (controls.addCircleButton) {
+    controls.addCircleButton.mousePressed(addMotionStoppingCircle);
+  } else {
+    console.error("Add circle button (#add-circle-button) not found!");
   }
-}
 
-function drawMotionStoppingCircles() {
-  for (let circle of motionStoppingCircles) {
-    if (isOpaque) {
-      fill("rgba(0, 255, 0, 0.3)");
-    } else {
-      noFill();
-    }
-    ellipse(circle.x, circle.y, circle.slider.value() * 2);
-
-    // Render labels only if isOpaque is true
-    if (isOpaque) {
-      textSize(12);
-      textAlign(CENTER, CENTER);
-      fill("white");
-      text(`C${circle.label}`, circle.x - 15, circle.y - 15);
-    }
+  controls.addScalePointButton = select("#add-scale-point-button");
+  if (controls.addScalePointButton) {
+    controls.addScalePointButton.mousePressed(addScalingPoint);
+  } else {
+    console.error(
+      "Add scale point button (#add-scale-point-button) not found!"
+    );
   }
-}
 
-function drawScalingPoints() {
-  for (let point of scalingPoints) {
-    if (isOpaque) {
-      fill("magenta");
-    } else {
-      noFill();
-    }
-    ellipse(point.x, point.y, 10);
-
-    // Render labels only if isOpaque is true
-    if (isOpaque) {
-      textSize(12);
-      textAlign(CENTER, CENTER);
-      fill("white");
-      text(`S${point.label}`, point.x - 15, point.y - 15);
-    }
+  visual.bgColorPicker = select("#bg-color-picker");
+  if (!visual.bgColorPicker) {
+    console.error("Background color picker (#bg-color-picker) not found!");
   }
-}
 
-function clearAll() {
-  // Remove all attraction point sliders
-  attractionPoints.forEach((point) => {
-    point.slider.parent().remove();
-  });
-
-  // Remove all motion-stopping circle sliders
-  motionStoppingCircles.forEach((circle) => {
-    circle.slider.parent().remove();
-  });
-
-  // Remove all scaling point sliders
-  scalingPoints.forEach((point) => {
-    point.intensitySlider.parent().remove();
-  });
-
-  // Clear all arrays
-  attractionPoints = [];
-  motionStoppingCircles = [];
-  scalingPoints = [];
-  interactions = [];
-  selectedItem = null;
-}
-
-function deleteSelected() {
-  if (selectedItem) {
-    if (selectedItem.type === "attraction") {
-      // Remove the DOM elements of the slider
-      selectedItem.item.slider.parent().remove();
-      // Remove the point from the array
-      attractionPoints = attractionPoints.filter(
-        (p) => p !== selectedItem.item
-      );
-    } else if (selectedItem.type === "circle") {
-      // Remove the DOM elements of the slider
-      selectedItem.item.slider.parent().remove();
-      // Remove the circle from the array
-      motionStoppingCircles = motionStoppingCircles.filter(
-        (c) => c !== selectedItem.item
-      );
-    } else if (selectedItem.type === "scaling") {
-      // Remove the DOM elements of the slider
-      selectedItem.item.intensitySlider.parent().remove();
-      // Remove the point from the array
-      scalingPoints = scalingPoints.filter((p) => p !== selectedItem.item);
-    }
-
-    // Deselect the current item
-    selectedItem = null;
+  let imageInput = select("#image-input");
+  if (imageInput) {
+    imageInput.changed(handleImageUpload);
+  } else {
+    console.error("Image input (#image-input) not found!");
   }
 }
 
@@ -626,59 +761,65 @@ function mousePressed(event) {
   ) {
     let foundItem = false;
 
-    isDragging = null;
-    draggingCircle = null;
-    draggingScalePoint = null;
+    state.isDragging = null;
+    state.draggingCircle = null;
+    state.draggingScalePoint = null;
 
-    attractionPoints.forEach((point, i) => {
-      if (dist(mouseX, mouseY, point.x, point.y) < 10) {
-        selectedItem = { item: point, type: "attraction" };
-        isDragging = i;
-        foundItem = true;
-      }
-    });
+    if (points.attractionPoints) {
+      points.attractionPoints.forEach((point, i) => {
+        if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+          state.selectedItem = { item: point, type: "attraction" };
+          state.isDragging = i;
+          foundItem = true;
+        }
+      });
+    }
 
-    motionStoppingCircles.forEach((circle, i) => {
-      if (dist(mouseX, mouseY, circle.x, circle.y) < circle.slider.value()) {
-        selectedItem = { item: circle, type: "circle" };
-        draggingCircle = i;
-        foundItem = true;
-      }
-    });
+    if (points.motionStoppingCircles) {
+      points.motionStoppingCircles.forEach((circle, i) => {
+        if (dist(mouseX, mouseY, circle.x, circle.y) < circle.slider.value()) {
+          state.selectedItem = { item: circle, type: "circle" };
+          state.draggingCircle = i;
+          foundItem = true;
+        }
+      });
+    }
 
-    scalingPoints.forEach((point, i) => {
-      if (dist(mouseX, mouseY, point.x, point.y) < 10) {
-        selectedItem = { item: point, type: "scaling" };
-        draggingScalePoint = i;
-        foundItem = true;
-      }
-    });
+    if (points.scalingPoints) {
+      points.scalingPoints.forEach((point, i) => {
+        if (dist(mouseX, mouseY, point.x, point.y) < 10) {
+          state.selectedItem = { item: point, type: "scaling" };
+          state.draggingScalePoint = i;
+          foundItem = true;
+        }
+      });
+    }
 
     if (!foundItem) {
-      selectedItem = null;
+      state.selectedItem = null;
     }
   }
 }
 
 function mouseDragged() {
-  if (isDragging !== null) {
-    attractionPoints[isDragging].x = mouseX;
-    attractionPoints[isDragging].y = mouseY;
+  if (state.isDragging !== null) {
+    visual.attractionPoints[state.isDragging].x = mouseX;
+    visual.attractionPoints[state.isDragging].y = mouseY;
   }
-  if (draggingCircle !== null) {
-    motionStoppingCircles[draggingCircle].x = mouseX;
-    motionStoppingCircles[draggingCircle].y = mouseY;
+  if (state.draggingCircle !== null) {
+    visual.motionStoppingCircles[state.draggingCircle].x = mouseX;
+    visual.motionStoppingCircles[state.draggingCircle].y = mouseY;
   }
-  if (draggingScalePoint !== null) {
-    scalingPoints[draggingScalePoint].x = mouseX;
-    scalingPoints[draggingScalePoint].y = mouseY;
+  if (state.draggingScalePoint !== null) {
+    visual.scalingPoints[state.draggingScalePoint].x = mouseX;
+    visual.scalingPoints[state.draggingScalePoint].y = mouseY;
   }
 }
 
 function mouseReleased() {
-  isDragging = null;
-  draggingCircle = null;
-  draggingScalePoint = null;
+  state.isDragging = null;
+  state.draggingCircle = null;
+  state.draggingScalePoint = null;
 }
 
 function keyPressed() {

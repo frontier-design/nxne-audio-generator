@@ -11,6 +11,9 @@
 
   <script src="libraries/p5.min.js"></script>
   <script src="libraries/p5.sound.min.js"></script>
+  <!-- <script src="https://www.youtube.com/iframe_api"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/p5.capture"></script> -->
 </head>
 
 <body>
@@ -19,17 +22,16 @@
     <h3>Playback Controls</h3> <br>
     <button id="play-button">Play</button>
     <button id="toggle-opacity-button">Toggle Opacity</button> <br>
+    <button id="start-recording">Start Rec</button>
+    <button id="stop-recording">Stop Rec</button> <br>
 
     <h3>Actions</h3> <br>
     <button id="clear-button">Clear All</button>
     <button id="delete-button">Delete Selected</button>
 
-
     <h3>Slice Controls</h3> <br>
     <label for="slice-slider">Slices</label><br>
     <input type="range" id="slice-slider" min="2" max="50" value="10" step="1"> <br>
-
-
 
     <label for="damping-slider">Damping Factor</label><br>
     <input type="range" id="damping-slider" min="0" max="1" value="0.7" step="0.01"><br>
@@ -61,19 +63,33 @@
     <input type="file" id="image-input" accept="image/*"> <br>
 
     <label for="audio-input">Upload Audio</label>
-    <input type="file" id="audio-input" accept="audio/*">
+    <input type="file" id="audio-input" accept="audio/*"> <br>
+
+    <label for="youtube-url">YouTube URL</label><br>
+    <input type="text" id="youtube-url" placeholder="Enter YouTube link"> <br> <br>
+    <button id="youtube-load-button">Load YouTube Audio</button> <br>
+
+    <label for="video-input">Upload Video</label>
+    <input type="file" id="video-input" accept="video/*"> <br>
 
     <h3>Background Color</h3> <br>
-    <input type="color" id="bg-color-picker" value="#000000">
+    <input type="color" id="bg-color-picker" value="#000000"> <br>
+
+    <h3>Layer Color</h3> <br>
+    <input type="color" id="layer-color-picker" value="#00ff00">
+
   </div>
 
   <div id="intensity-panel">
     <h3>Intensity Controllers</h3>
   </div>
 
+  <!-- Hidden YouTube Player -->
+  <iframe id="youtube-player" width="0" height="0" style="display:none" allow="autoplay"></iframe>
 
-
-  <script src="./sketch.js"></script>
+  <!-- <script src="./video-recorder.js"></script> -->
+  <script src="./working-sketch.js"></script>
+  <!-- <script src="./sketch.js"></script> -->
 </body>
 
 </html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <title>YouTube Audio Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            margin-top: 20px;
+        }
+
+        #player {
+            display: none;
+            /* Hide the YouTube iframe */
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <input type="text" id="youtube-url" placeholder="Enter YouTube Video ID" />
+        <button id="load-button">Load YouTube Video</button>
+        <button id="play-button" disabled>Play</button>
+    </div>
+    <div id="player"></div>
+
+    <script>
+        let player;
+        let fft;
+        let audioContext;
+        let audioSource;
+        let isPlaying = false;
+
+        function setup() {
+            createCanvas(800, 400);
+            fft = new p5.FFT();
+            noLoop(); // Stop the p5.js draw loop initially
+
+            // Button Event Listeners
+            document.getElementById("load-button").addEventListener("click", loadYouTubeVideo);
+            document.getElementById("play-button").addEventListener("click", togglePlay);
+        }
+
+        function draw() {
+            background(0);
+
+            if (fft) {
+                const spectrum = fft.analyze();
+
+                // Draw frequency spectrum
+                noFill();
+                stroke(255);
+                beginShape();
+                for (let i = 0; i < spectrum.length; i++) {
+                    const x = map(i, 0, spectrum.length, 0, width);
+                    const y = map(spectrum[i], 0, 255, height, 0);
+                    vertex(x, y);
+                }
+                endShape();
+            }
+        }
+
+        function loadYouTubeVideo() {
+            const videoId = document.getElementById("youtube-url").value.trim();
+            if (!videoId) {
+                alert("Please enter a valid YouTube video ID.");
+                return;
+            }
+
+            if (player) {
+                player.destroy(); // Destroy the existing player
+            }
+
+            // Create a new YouTube Player
+            player = new YT.Player("player", {
+                height: "0",
+                width: "0",
+                videoId: videoId,
+                events: {
+                    onReady: onPlayerReady,
+                    onStateChange: onPlayerStateChange,
+                },
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log("YouTube Player is ready.");
+            document.getElementById("play-button").disabled = false;
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                if (!audioContext) {
+                    setupAudioContext();
+                }
+                loop(); // Resume p5.js draw loop
+            } else {
+                noLoop(); // Pause p5.js draw loop
+            }
+        }
+
+        function setupAudioContext() {
+            console.log("Setting up audio context...");
+            audioContext = getAudioContext();
+
+            // Create a MediaElementAudioSourceNode
+            const mediaElement = player.getIframe();
+            const audioStream = mediaElement.contentWindow.document.querySelector("audio");
+            if (!audioStream) {
+                console.error("Audio stream not found in the YouTube player iframe.");
+                return;
+            }
+            audioSource = audioContext.createMediaElementSource(audioStream);
+            fft.setInput(audioSource);
+        }
+
+        function togglePlay() {
+            if (!player) {
+                alert("Please load a YouTube video first.");
+                return;
+            }
+
+            if (isPlaying) {
+                player.pauseVideo();
+            } else {
+                player.playVideo();
+            }
+            isPlaying = !isPlaying;
+        }
+    </script>
+</body>
+
+</html>

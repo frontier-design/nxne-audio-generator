@@ -139,7 +139,8 @@ button:hover {
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
 
 input [type="color"],
-#bg-color-picker {
+#bg-color-picker,
+#layer-color-picker {
   -webkit-appearance: none;
   cursor: pointer;
   width: 32px;
@@ -147,4 +148,14 @@ input [type="color"],
   border: 1px solid white;
   background-color: rgba(0, 0, 0, 0);
   padding: 0;
+}
+
+.p5c-container,
+.idle{
+  position: fixed;
+  width: 150px;
+  height: 100px;
+  bottom: 0;
+  right: 0;
+  border: 1px solid red;
 }
