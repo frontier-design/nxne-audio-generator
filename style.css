@@ -19,6 +19,13 @@ html, body {
   align-items: center;
 }
 
+
+body{
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -68,11 +75,12 @@ canvas {
 #intensity-panel {
   position: absolute;
   top: 10px;
-  padding: 15px;
+  /* padding: 15px; */
   background: rgba(0, 0, 0, 0);
   color: white;
   width: auto;
-  max-height: 90vh;
+  max-height: calc(100vh - 30px);
+  /* border: 1px solid black; */
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -88,6 +96,7 @@ canvas {
   flex-direction: column;
   background: black;
   border-radius: 20px;
+  padding: 15px; 
 }
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
@@ -126,6 +135,7 @@ input[type="range"]::-moz-range-thumb {
 input[type="file"] {
   display: none;
 }
+
 .custom-file-upload {
   border-radius: 100px;
   background-color: white;
@@ -133,6 +143,13 @@ input[type="file"] {
   padding: 6px 12px;
   cursor: pointer;
   margin-bottom: 10px;
+  border: 1px solid white;
+}
+
+.custom-file-upload:hover {
+  background-color: rgba(0, 0, 0, 0);
+  color: black;
+  border: 1px solid black;
 }
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
@@ -212,12 +229,6 @@ input [type="color"]::-moz-color-swatch {
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
 
-.block {
-  margin-bottom: 10px;
-  border-radius: 20px;
-  padding: 15px 20px;
-  width: 10vw;
-}
 
 .playback-controls{
   background-color: #ff3d00;
@@ -232,6 +243,7 @@ input [type="color"]::-moz-color-swatch {
 }
 
 .damping-factor{
+  display: none;
   background-color: blue;
 }
 
@@ -240,14 +252,13 @@ input [type="color"]::-moz-color-swatch {
 }
 
 .radius-sliders{
-  background-color: #ff0;
-  color: black;
+  background-color: blue;
 }
 
-.radius-sliders input[type="range"], 
+/* .radius-sliders input[type="range"], 
 .radius-sliders input[type="range"]::-webkit-slider-thumb {
   background: black;
-}
+} */
 
 .uploads{
   background-color: #05ff00;
@@ -255,5 +266,15 @@ input [type="color"]::-moz-color-swatch {
 }
 
 .background-color-picker{
-  background-color: #ff00a6;
+  background-color: #ff0;
+  color: black;
+}
+
+.block {
+  margin-bottom: 10px;
+  border-radius: 20px;
+  padding: 15px 20px;
+  width: 10vw;
+  /* background-color: black; */
+  /* color: white; */
 }
