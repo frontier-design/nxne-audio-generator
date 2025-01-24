@@ -33,6 +33,8 @@ let attractionIndex = 1;
 let circleIndex = 1;
 let scalingIndex = 1;
 
+let maxDimension;
+
 function preload() {
   img = loadImage("assets/images/replacement.jpg");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
@@ -51,6 +53,8 @@ function setup() {
   initializeControls();
   addAttractionPoint();
   imageMode(CENTER);
+
+  maxDimension = width / 2.3;
 }
 
 function draw() {
@@ -85,7 +89,6 @@ function handleImageUpload(event) {
     img = loadImage(URL.createObjectURL(file), () => {
       let numSlices = sliceSlider.value();
 
-      let maxDimension = 700;
       let scaleFactor = Math.min(
         1,
         maxDimension / img.width,
@@ -167,7 +170,8 @@ function addAttractionPoint() {
   sliderLabel.style("margin-left", "8px");
   sliderLabel.style("margin-top", "-15px");
   sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(255, 0, 0, 0.3)");
+  sliderLabel.style("background-color", "rgba(255, 0, 0, 0.35)");
+  sliderLabel.style("border-radius", "4px");
   sliderLabel.style("padding", "1px 3px");
 
   newPoint.slider.parent(sliderContainer);
@@ -194,7 +198,8 @@ function addMotionStoppingCircle() {
   sliderLabel.style("color", "rgb(0,255,0)");
   sliderLabel.style("margin-left", "8px");
   sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(0, 255, 0, 0.3)");
+  sliderLabel.style("background-color", "rgba(0, 255, 0, 0.35)");
+  sliderLabel.style("border-radius", "4px");
   sliderLabel.style("padding", "1px 3px");
 
   newCircle.slider.parent(sliderContainer);
@@ -221,7 +226,8 @@ function addScalingPoint() {
   sliderLabel.style("color", "magenta");
   sliderLabel.style("margin-left", "8px");
   sliderLabel.style("margin-top", "-15px");
-  sliderLabel.style("background-color", "rgba(255, 0, 255, 0.3)");
+  sliderLabel.style("background-color", "rgba(255, 0, 255, 0.35)");
+  sliderLabel.style("border-radius", "4px");
   sliderLabel.style("padding", "1px 3px");
 
   newPoint.intensitySlider.parent(sliderContainer);
@@ -333,7 +339,6 @@ function deleteSelected() {
 
 function processVisualEffects() {
   let numSlices = sliceSlider.value();
-  let maxDimension = 700;
   let scaleFactor = Math.min(
     1,
     maxDimension / img.width,
