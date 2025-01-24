@@ -35,10 +35,17 @@ a {
 
 #downloadLink{
   display: inline-block;
-  background-color: black;
+  background-color: #ff006c;
   color: white;
   border-radius: 100px;
   padding: 5px 15px;
+  border: 1px solid white;
+}
+
+#downloadLink:hover{
+  background-color: white;
+  border: 1px solid #ff006c;
+  color: #ff006c;
 }
 
 h1, h2, h3, h4, h5, h6,label {
@@ -68,7 +75,17 @@ canvas {
   bottom: 10px;
   right: 10px;
   z-index: 1000;
-  background-color:#ffaa00;
+  background-color: white;
+  border: 1px dashed black;
+}
+
+.container button{
+  border: 1px solid black;
+}
+
+.container button:hover{
+  background-color: black;
+  color: white;
 }
 
 #control-panel,
@@ -144,12 +161,13 @@ input[type="file"] {
   cursor: pointer;
   margin-bottom: 10px;
   border: 1px solid white;
+  color: black;
 }
 
 .custom-file-upload:hover {
   background-color: rgba(0, 0, 0, 0);
-  color: black;
-  border: 1px solid black;
+  border: 1px solid white;
+  color: white;
 }
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
@@ -261,8 +279,7 @@ input [type="color"]::-moz-color-swatch {
 } */
 
 .uploads{
-  background-color: #05ff00;
-  color: black;
+  background-color: #ff009d;
 }
 
 .background-color-picker{
