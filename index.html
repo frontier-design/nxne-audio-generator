@@ -2,94 +2,93 @@
 <html lang="en">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Sketch</title>
+    <title>Sketch</title>
 
-  <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
 
-  <script src="libraries/p5.min.js"></script>
-  <script src="libraries/p5.sound.min.js"></script>
-  <!-- <script src="https://www.youtube.com/iframe_api"></script> -->
-  <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
-  <!-- <script src="https://cdn.jsdelivr.net/npm/p5.capture"></script> -->
+    <script src="libraries/p5.min.js"></script>
+    <script src="libraries/p5.sound.min.js"></script>
 </head>
 
 <body>
+    <div class="container block">
+        <div class="controls">
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn" disabled>Stop Recording</button>
+        </div>
+        <a id="downloadLink" href="#" download="canvas-recording.webm" style="display: none;"> Download Rec </a>
+    </div>
 
-  <div id="control-panel">
-    <h3>Playback Controls</h3> <br>
-    <button id="play-button">Play</button>
-    <button id="toggle-opacity-button">Toggle Opacity</button> <br>
-    <button id="start-recording">Start Rec</button>
-    <button id="stop-recording">Stop Rec</button> <br>
+    <div id="control-panel">
+        <div class="playback-controls block">
+            <h3>Playback Controls</h3> <br>
+            <button id="play-button">Play</button>
+        </div>
 
-    <h3>Actions</h3> <br>
-    <button id="clear-button">Clear All</button>
-    <button id="delete-button">Delete Selected</button>
+        <div class="actions block">
+            <h3>Actions</h3> <br>
+            <button id="clear-button">Clear All</button>
+            <button id="delete-button">Delete Selected</button>
+            <button id="toggle-opacity-button">Toggle Opacity</button>
+        </div>
 
-    <h3>Slice Controls</h3> <br>
-    <label for="slice-slider">Slices</label><br>
-    <input type="range" id="slice-slider" min="2" max="50" value="10" step="1"> <br>
+        <div class="slice-controls block">
+            <h3>Slices</h3> <br>
+            <input type="range" id="slice-slider" min="4" max="10" value="7" step="1">
+        </div>
 
-    <label for="damping-slider">Damping Factor</label><br>
-    <input type="range" id="damping-slider" min="0" max="1" value="0.7" step="0.01"><br>
+        <div class="damping-factor block">
+            <h3>Damping Factor</h3>
+            <input type="range" id="damping-slider" min="0" max="1" value="0.7" step="0.01">
+        </div>
 
-    <h3>Interaction Controls</h3> <br>
-    <button id="add-point-button">
-      <div class="point attractionPoint"></div> Attraction Point
-    </button>
-    <button id="add-circle-button">
-      <div class="point motionCircle"></div> Motion Stopping Circle
-    </button> <br>
-    <button id="add-scale-point-button">
-      <div class="point scalePoint"></div> Scale Point
-    </button>
+        <div class="interactions-controls block">
+            <h3>Interaction Controls</h3> <br>
+            <button id="add-point-button">
+                <div class="point attractionPoint"></div> Attract
+            </button>
+            <button id="add-circle-button">
+                <div class="point motionCircle"></div> Stop
+            </button>
+            <button id="add-scale-point-button">
+                <div class="point scalePoint"></div> Scale
+            </button>
+        </div>
 
-    <h3> Radius Of Influence </h3> <br>
-    <label for="radius-slider"> Attraction Radius</label><br>
-    <input type="range" id="radius-slider" min="50" max="1000" value="250" step="10"> <br>
-    <label for="radius-slider"> Scaling Radius</label><br>
-    <input type="range" id="scale-radius-slider" min="0" max="1000" value="250" step="10">
-    <br>
-    <h3>Path Controls</h3> <br>
-    <label for="path-length-slider">Path Length</label><br>
-    <input type="range" id="path-length-slider" min="0" max="50" value="10" step="1">
+        <div class="radius-sliders block">
+            <h3> Radius Of Influence </h3> <br>
+            <label for="radius-slider"> Attraction Radius</label> <br>
+            <input type="range" id="radius-slider" min="50" max="1000" value="250" step="10">
+            <label for="radius-slider"> Scaling Radius</label> <br>
+            <input type="range" id="scale-radius-slider" min="0" max="1000" value="550" step="10">
+        </div>
 
-    <br>
-    <h3>Uploads</h3> <br>
-    <label for="image-input">Upload Image</label>
-    <input type="file" id="image-input" accept="image/*"> <br>
+        <div class="uploads block">
+            <h3>Uploads</h3> <br>
+            <label class="custom-file-upload" for="image-input">Upload Image</label>
+            <input type="file" id="image-input" accept="image/*">
 
-    <label for="audio-input">Upload Audio</label>
-    <input type="file" id="audio-input" accept="audio/*"> <br>
+            <label class="custom-file-upload" for="audio-input">Upload Audio</label>
+            <input type="file" id="audio-input" accept="audio/*">
+        </div>
 
-    <label for="youtube-url">YouTube URL</label><br>
-    <input type="text" id="youtube-url" placeholder="Enter YouTube link"> <br> <br>
-    <button id="youtube-load-button">Load YouTube Audio</button> <br>
+        <div class="background-color-picker block">
+            <h3>Background Color</h3> <br>
+            <input type="color" id="bg-color-picker" value="#D1D1D1">
+        </div>
 
-    <label for="video-input">Upload Video</label>
-    <input type="file" id="video-input" accept="video/*"> <br>
 
-    <h3>Background Color</h3> <br>
-    <input type="color" id="bg-color-picker" value="#000000"> <br>
+    </div>
 
-    <h3>Layer Color</h3> <br>
-    <input type="color" id="layer-color-picker" value="#00ff00">
+    <div id="intensity-panel">
+        <h3>Intensity Controllers</h3> <br>
+    </div>
 
-  </div>
-
-  <div id="intensity-panel">
-    <h3>Intensity Controllers</h3>
-  </div>
-
-  <!-- Hidden YouTube Player -->
-  <iframe id="youtube-player" width="0" height="0" style="display:none" allow="autoplay"></iframe>
-
-  <!-- <script src="./video-recorder.js"></script> -->
-  <script src="./working-sketch.js"></script>
-  <!-- <script src="./sketch.js"></script> -->
+    <script src="./record.js"></script>
+    <script src="./working-sketch.js"></script>
 </body>
 
 </html>

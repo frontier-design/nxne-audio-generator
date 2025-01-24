@@ -10,6 +10,7 @@ let addScalePointButton;
 let scaleRadiusSlider;
 let radiusSlider;
 let bgColorPicker;
+let pathLengthSlider;
 
 let attractionPoints = [];
 let scalingPoints = [];
@@ -18,6 +19,8 @@ let originalPositions = [];
 let animatedPositions = [];
 let previousSpectrum = [];
 let interactions = [];
+let pathHistories = [];
+let colorPathHistories = [];
 
 let isDragging = null;
 let draggingCircle = null;
@@ -33,8 +36,24 @@ let attractionIndex = 1;
 let circleIndex = 1;
 let scalingIndex = 1;
 
+let youtubePlayer;
+let youtubeAudioLoaded = false;
+let videoElement;
+let isVideoLoaded = false;
+
+let capture;
+let recording = false;
+
+let layerColor = "#00ff00"; // Default layer color
+
+function extractYouTubeID(url) {
+  const regExp = /^.*(?:youtu\.be\/|v\/|embed\/|watch\?v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[1].length === 11 ? match[1] : null;
+}
+
 function preload() {
-  img = loadImage("assets/images/replacement.jpg");
+  img = loadImage("assets/images/murathanE.png");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
 }
 
@@ -56,14 +75,60 @@ function setup() {
 function draw() {
   background(bgColorPicker.value());
 
+  // Analyze the audio spectrum
   let spectrum = fft.analyze();
   smoothSpectrum(spectrum);
 
+  // Process visual effects
   processVisualEffects();
 
+  // Draw the attraction points, circles, and scaling points
   drawAttractionPoints();
   drawMotionStoppingCircles();
   drawScalingPoints();
+
+  // Recording process
+  if (recording && capture) {
+    try {
+      capture.capture(document.querySelector("canvas"));
+    } catch (error) {
+      console.error("Error during capture:", error);
+    }
+  }
+}
+
+function startRecording() {
+  if (!recording) {
+    capture = new CCapture({
+      format: "webm",
+      framerate: 30,
+      verbose: true, // Enables logging for debugging
+      quality: 100, // High-quality output
+      autoSaveTime: 0, // Avoid premature saving
+    });
+
+    frameRate(30); // Lock frame rate for consistent recording
+    capture.start();
+    recording = true;
+    console.log("Recording started...");
+  }
+}
+
+function stopRecording() {
+  if (recording) {
+    console.log("Finalizing recording...");
+    capture.stop();
+    setTimeout(() => {
+      try {
+        capture.save(); // Save recording after a delay
+        console.log("Recording saved.");
+      } catch (error) {
+        console.error("Error during saving:", error);
+      }
+    }, 100); // Allow time for processing
+    recording = false;
+    frameRate(60); // Restore frame rate after recording
+  }
 }
 
 function smoothSpectrum(spectrum) {
@@ -71,7 +136,7 @@ function smoothSpectrum(spectrum) {
     previousSpectrum = spectrum.slice();
   }
 
-  let alpha = 0.3;
+  let alpha = 0.3; // Smoothing factor
   for (let i = 0; i < spectrum.length; i++) {
     previousSpectrum[i] =
       alpha * spectrum[i] + (1 - alpha) * previousSpectrum[i];
@@ -106,6 +171,7 @@ function handleImageUpload(event) {
 
       originalPositions = [];
       animatedPositions = [];
+      pathHistories = [];
 
       for (let y = 0; y < numSlices; y++) {
         for (let x = 0; x < numSlices; x++) {
@@ -113,6 +179,7 @@ function handleImageUpload(event) {
           let posY = imgTopLeftY + y * baseSliceHeight;
           originalPositions.push({ x: posX, y: posY });
           animatedPositions.push({ x: posX, y: posY });
+          pathHistories.push([]);
         }
       }
     });
@@ -133,8 +200,97 @@ function handleAudioUpload(event) {
   }
 }
 
+function handleVideoUpload(event) {
+  const file = event.target.files[0];
+  if (file && file.type.startsWith("video")) {
+    const url = URL.createObjectURL(file);
+    videoElement = createVideo(url, () => {
+      videoElement.hide();
+      fft = new p5.FFT();
+    });
+    videoElement.volume(1);
+  }
+}
+
+function onVideoLoaded() {
+  video.loop();
+  isVideoLoaded = true;
+  console.log("Video loaded successfully");
+}
+
+function loadYouTubeAudio() {
+  const urlInput = document.getElementById("youtube-url").value;
+
+  if (!urlInput) {
+    alert("Please enter a YouTube URL.");
+    return;
+  }
+
+  const videoId = extractYouTubeID(urlInput);
+  if (!videoId) {
+    alert("Invalid YouTube URL.");
+    return;
+  }
+
+  const youtubePlayerElement = document.getElementById("youtube-player");
+  youtubePlayerElement.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1&origin=${location.origin}`;
+
+  youtubeAudioLoaded = true;
+  isPlaying = false;
+  document.getElementById("play-button").innerText = "Play";
+
+  youtubePlayer = new YT.Player("youtube-player", {
+    events: {
+      onReady: () => {
+        alert("YouTube video loaded successfully!");
+        console.log("YouTube Player Loaded");
+      },
+      onStateChange: (event) => {
+        if (event.data === YT.PlayerState.PLAYING) {
+          isPlaying = true;
+          document.getElementById("play-button").innerText = "Stop";
+        } else if (
+          event.data === YT.PlayerState.PAUSED ||
+          event.data === YT.PlayerState.ENDED
+        ) {
+          isPlaying = false;
+          document.getElementById("play-button").innerText = "Play";
+        }
+      },
+      onError: (error) => {
+        console.error("YouTube Player Error:", error);
+      },
+    },
+  });
+}
+
+function setupYouTubeAudio(videoId) {
+  const audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const hiddenAudioElement = createAudio(audioUrl);
+  hiddenAudioElement.id("youtube-audio");
+  hiddenAudioElement.hide();
+  hiddenAudioElement.loop(false);
+
+  hiddenAudioElement.play();
+  fft.setInput(hiddenAudioElement);
+}
+
 function togglePlay() {
-  if (song && song.isPlaying()) {
+  if (recording) {
+    console.log("Recording in progress... Ensure playback is synced.");
+  }
+
+  if (youtubeAudioLoaded && youtubePlayer) {
+    if (!isPlaying) {
+      youtubePlayer.playVideo();
+      isPlaying = true;
+      document.getElementById("play-button").innerText = "Stop";
+    } else {
+      youtubePlayer.pauseVideo();
+      isPlaying = false;
+      document.getElementById("play-button").innerText = "Play";
+    }
+  } else if (song && song.isPlaying()) {
     song.stop();
     isPlaying = false;
     document.getElementById("play-button").innerText = "Play";
@@ -142,6 +298,20 @@ function togglePlay() {
     song.loop();
     isPlaying = true;
     document.getElementById("play-button").innerText = "Stop";
+  } else if (videoElement) {
+    if (!isPlaying) {
+      videoElement.play();
+      isPlaying = true;
+      document.getElementById("play-button").innerText = "Stop";
+    } else {
+      videoElement.pause();
+      isPlaying = false;
+      document.getElementById("play-button").innerText = "Play";
+    }
+  } else {
+    alert(
+      "No audio source loaded. Please upload an audio file or load a YouTube video."
+    );
   }
 }
 
@@ -245,7 +415,7 @@ function drawAttractionPoints() {
     if (isOpaque) {
       textSize(12);
       textAlign(CENTER, CENTER);
-      fill("red");
+      fill("white");
       text(`A${point.label}`, point.x - 15, point.y - 15);
     }
   }
@@ -263,7 +433,7 @@ function drawMotionStoppingCircles() {
     if (isOpaque) {
       textSize(12);
       textAlign(CENTER, CENTER);
-      fill("green");
+      fill("white");
       text(`C${circle.label}`, circle.x - 15, circle.y - 15);
     }
   }
@@ -281,7 +451,7 @@ function drawScalingPoints() {
     if (isOpaque) {
       textSize(12);
       textAlign(CENTER, CENTER);
-      fill("magenta");
+      fill("white");
       text(`S${point.label}`, point.x - 15, point.y - 15);
     }
   }
@@ -355,6 +525,8 @@ function processVisualEffects() {
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
+    pathHistories = [];
+    colorPathHistories = [];
 
     for (let y = 0; y < numSlices; y++) {
       for (let x = 0; x < numSlices; x++) {
@@ -362,10 +534,13 @@ function processVisualEffects() {
         let posY = imgTopLeftY + y * baseSliceHeight;
         originalPositions.push({ x: posX, y: posY });
         animatedPositions.push({ x: posX, y: posY });
+        pathHistories.push([]);
+        colorPathHistories.push([]);
       }
     }
   }
 
+  let pathLength = pathLengthSlider.value();
   let index = 0;
 
   for (let y = 0; y < numSlices; y++) {
@@ -403,6 +578,8 @@ function processVisualEffects() {
 
           colorEffectX += dx * distanceFactor * 2;
           colorEffectY += dy * distanceFactor * 2;
+
+          console.log(radiusSlider.value());
         }
       }
 
@@ -471,7 +648,7 @@ function processVisualEffects() {
       animatedPositions[index].x = lerp(
         animatedPositions[index].x,
         targetX + cumulativeEffectX,
-        0.6
+        0.6 // set it up for now
       );
       animatedPositions[index].y = lerp(
         animatedPositions[index].y,
@@ -489,6 +666,41 @@ function processVisualEffects() {
         targetY + colorEffectY,
         0.2
       );
+
+      if (pathLength > 0) {
+        pathHistories[index].push({
+          x: animatedPositions[index].x,
+          y: animatedPositions[index].y,
+          scale: sliceScaleFactor,
+        });
+
+        colorPathHistories[index].push({
+          x: colorX,
+          y: colorY,
+          scale: colorScaleFactor,
+        });
+
+        while (pathHistories[index].length > pathLength) {
+          pathHistories[index].shift();
+        }
+
+        while (colorPathHistories[index].length > pathLength) {
+          colorPathHistories[index].shift();
+        }
+
+        // Draw color path histories using selected color
+        for (let i = 0; i < colorPathHistories[index].length; i++) {
+          let pos = colorPathHistories[index][i];
+          push();
+          translate(pos.x + baseSliceWidth / 2, pos.y + baseSliceHeight / 2);
+          scale(pos.scale);
+          rectMode(CENTER);
+          fill(layerColor); // Use the selected color
+          noStroke();
+          rect(0, 0, finalColorWidth, finalColorHeight);
+          pop();
+        }
+      }
 
       push();
       translate(
@@ -543,6 +755,8 @@ function initializeControls() {
     dampingValue = float(dampingSlider.value());
   });
 
+  pathLengthSlider = select("#path-length-slider");
+
   addPointButton = select("#add-point-button");
   addPointButton.mousePressed(addAttractionPoint);
 
@@ -556,6 +770,11 @@ function initializeControls() {
 
   imageInput = select("#image-input");
   imageInput.changed(handleImageUpload);
+
+  const layerColorPicker = document.getElementById("layer-color-picker");
+  layerColorPicker.addEventListener("input", (event) => {
+    layerColor = event.target.value;
+  });
 }
 
 function mousePressed(event) {
