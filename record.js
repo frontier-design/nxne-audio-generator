@@ -233,7 +233,7 @@ startBtn.addEventListener("click", async () => {
         mediaRecorder.stop();
         console.log("Automatically stopping recording after 10 seconds...");
       }
-    }, 11000); // 10 seconds
+    }, 11000);
   } catch (err) {
     console.error("Error starting recording:", err.message || err);
     alert(`Error: ${err.message}`);

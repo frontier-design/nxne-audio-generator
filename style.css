@@ -292,6 +292,6 @@ input [type="color"]::-moz-color-swatch {
   border-radius: 20px;
   padding: 15px 20px;
   width: 10vw;
-  /* background-color: black; */
-  /* color: white; */
+  background-color: black;
+  color: white;
 }
