@@ -57,6 +57,7 @@ h3{
   text-transform: uppercase;
   display: inline-block;
   border-radius: 0px;
+  margin-bottom: 20px;
   font-weight: 500;
 }
 
@@ -290,7 +291,7 @@ input [type="color"]::-moz-color-swatch {
 .block {
   margin-bottom: 10px;
   border-radius: 20px;
-  padding: 15px 20px;
+  padding: 12px 20px 15px 20px;
   width: 10vw;
   background-color: black;
   color: white;
