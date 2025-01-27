@@ -13,21 +13,6 @@ exports it as .webm, using CloudConvert API converts the file into an .mp4 and g
 - Upload your audio file to generate real-time audio spectrum analysis.
 - The sketch uses an FFT (Fast Fourier Transform) algorithm to analyze audio frequencies and drive visual effects.
 
-### Image Slicing
-- Upload an image to create a grid of sliced segments.
-- Adjustable number of slices via a slider.
-- The grid reacts dynamically to attraction points, motion-stopping circles, and scaling points.
-
-### Interaction Points
-- **Attraction Points**: Draw slices toward their positions based on intensity and distance.
-- **Motion-Stopping Circles**: Reduce the movement of slices within their radius.
-- **Scaling Points**: Adjust the size of slices dynamically based on distance and audio intensity.
-
-### Customization Controls
-- Change the background color using a color picker.
-- Toggle slice opacity to switch between transparent and filled modes.
-- Adjust interaction radii and damping factors to fine-tune the effects.
-
 ### Playback and Recording
 - Play and stop the audio with a dedicated button.
 - Record canvas animations and download them as a `.mp4` file.
