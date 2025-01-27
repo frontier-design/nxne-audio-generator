@@ -48,7 +48,7 @@ interactive-sketch/
 │   ├── audio/          # Sample audio file
 │   ├── images/         # Sample images
 ├── libraries/          # p5.js and p5.sound.js libraries
-├── style.css           # Custom styles for the control panel
+├── style.css           
 ├── index.html          # Main HTML file
 ├── sketch.js           # JavaScript file for the sketch (uses p5)
 ├── record.js           # Script for recording canvas animations
