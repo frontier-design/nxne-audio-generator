@@ -5,7 +5,7 @@ It combines user interaction, audio-driven animations, and visual effects to cre
 various parameters to produce unique visual compositions. The sketch is also equipped with playback and recording functionality. It records the p5 canvas,
 exports it as .webm, using CloudConvert API converts the file into an mp4 and generates a download link.
 
---
+---
 
 ## Features
 
