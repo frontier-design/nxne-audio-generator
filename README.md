@@ -92,7 +92,7 @@ This project is open-source and available under the [MIT License](LICENSE).
 ---
 
 ## Author
-Yigir Toprak
+Yigit Toprak
 - GitHub: [ygt-design](https://github.com/ygt-design)  
 - Portfolio: [yigit.world](https://yigit.world/)
 
