@@ -603,14 +603,14 @@ function initializeControls() {
 function toggleReactivity() {
   useAmplitude = !useAmplitude;
   if (useAmplitude) {
-    toggleReactivityButton.html("Switch to Waveform");
+    toggleReactivityButton.html("Switch to FFT Reactivity");
     // If the song is playing and amplitude hasn't been created, initialize it.
     if (song && song.isPlaying() && !amplitude) {
       amplitude = new p5.Amplitude();
       amplitude.setInput(song);
     }
   } else {
-    toggleReactivityButton.html("Switch to Amplitude");
+    toggleReactivityButton.html("Switch to Amplitude Reactivity");
   }
 }
 
