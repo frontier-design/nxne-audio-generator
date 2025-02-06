@@ -40,6 +40,9 @@ let maxDimension;
 let useAmplitude = false;
 let toggleReactivityButton; // reference for the new toggle button
 
+// NEW: Global variable for smoothed amplitude (only used for scaling).
+let smoothedAmp = 0;
+
 function preload() {
   img = loadImage("assets/images/replacement.jpg");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
@@ -65,7 +68,14 @@ function setup() {
 function draw() {
   background(bgColorPicker.value());
 
-  // Only compute FFT if not in amplitude mode
+  // When in amplitude mode, update smoothedAmp (for scaling only).
+  if (useAmplitude) {
+    let currentAmp = amplitude ? amplitude.getLevel() : 0;
+    // The lerp factor (0.25) controls smoothing speed (higher = faster)
+    smoothedAmp = lerp(smoothedAmp, currentAmp, 0.25);
+  }
+
+  // Only update FFT if not in amplitude mode.
   if (!useAmplitude) {
     let spectrum = fft.analyze();
     smoothSpectrum(spectrum);
@@ -153,7 +163,7 @@ function togglePlay() {
     song.loop();
     isPlaying = true;
     document.getElementById("play-button").innerText = "Stop";
-    // If using amplitude mode and amplitude hasn't been initialized, create it.
+    // If in amplitude mode and amplitude isn't initialized, create it.
     if (useAmplitude && !amplitude) {
       amplitude = new p5.Amplitude();
       amplitude.setInput(song);
@@ -170,7 +180,7 @@ function addAttractionPoint() {
   let newPoint = {
     x: width / 2,
     y: height / 2,
-    slider: createSlider(0, 500, 250),
+    slider: createSlider(0, 375, 250),
     label: attractionIndex,
   };
 
@@ -329,22 +339,18 @@ function deleteSelected() {
   if (selectedItem) {
     if (selectedItem.type === "attraction") {
       selectedItem.item.slider.parent().remove();
-
       attractionPoints = attractionPoints.filter(
         (p) => p !== selectedItem.item
       );
     } else if (selectedItem.type === "circle") {
       selectedItem.item.slider.parent().remove();
-
       motionStoppingCircles = motionStoppingCircles.filter(
         (c) => c !== selectedItem.item
       );
     } else if (selectedItem.type === "scaling") {
       selectedItem.item.intensitySlider.parent().remove();
-
       scalingPoints = scalingPoints.filter((p) => p !== selectedItem.item);
     }
-
     selectedItem = null;
   }
 }
@@ -372,7 +378,6 @@ function processVisualEffects() {
   if (originalPositions.length !== numSlices * numSlices) {
     originalPositions = [];
     animatedPositions = [];
-
     for (let y = 0; y < numSlices; y++) {
       for (let x = 0; x < numSlices; x++) {
         let posX = imgTopLeftX + x * baseSliceWidth;
@@ -384,7 +389,6 @@ function processVisualEffects() {
   }
 
   let index = 0;
-
   for (let y = 0; y < numSlices; y++) {
     for (let x = 0; x < numSlices; x++) {
       let targetX = originalPositions[index].x;
@@ -398,7 +402,7 @@ function processVisualEffects() {
       let colorEffectY = 0;
       let colorScaleFactor = 1;
 
-      // Process attraction points
+      // Process attraction points (raw amplitude for attraction)
       for (let point of attractionPoints) {
         let distance = dist(point.x, point.y, targetX, targetY);
         if (distance < radiusSlider.value()) {
@@ -415,8 +419,9 @@ function processVisualEffects() {
               point.slider.value()
             );
           } else {
-            let ampLevel = amplitude ? amplitude.getLevel() : 0;
-            intensity = map(ampLevel, 0, 1, 0, point.slider.value());
+            // Use raw amplitude for attraction points.
+            let rawAmp = amplitude ? amplitude.getLevel() : 0;
+            intensity = map(rawAmp, 0, 1, 0, point.slider.value());
           }
           let dx = (point.x - targetX) * 0.002 * intensity;
           let dy = (point.y - targetY) * 0.002 * intensity;
@@ -455,7 +460,7 @@ function processVisualEffects() {
         }
       }
 
-      // Process scaling points
+      // Process scaling points (smoothed amplitude for scaling)
       for (let scalePoint of scalingPoints) {
         let distance = dist(scalePoint.x, scalePoint.y, targetX, targetY);
         let scaleRadius = scaleRadiusSlider.value();
@@ -476,9 +481,9 @@ function processVisualEffects() {
               scalePoint.intensitySlider.value()
             );
           } else {
-            let ampLevel = amplitude ? amplitude.getLevel() : 0;
+            // Use the smoothed amplitude value for scaling.
             audioIntensity = map(
-              ampLevel,
+              smoothedAmp,
               0,
               1,
               1,
@@ -499,12 +504,6 @@ function processVisualEffects() {
         }
       }
 
-      let finalSliceWidth = baseSliceWidth * sliceScaleFactor;
-      let finalSliceHeight = baseSliceHeight * sliceScaleFactor;
-
-      let finalColorWidth = baseSliceWidth * colorScaleFactor;
-      let finalColorHeight = baseSliceHeight * colorScaleFactor;
-
       animatedPositions[index].x = lerp(
         animatedPositions[index].x,
         targetX + cumulativeEffectX,
@@ -514,17 +513,6 @@ function processVisualEffects() {
         animatedPositions[index].y,
         targetY + cumulativeEffectY,
         0.6
-      );
-
-      let colorX = lerp(
-        animatedPositions[index].x,
-        targetX + colorEffectX,
-        0.2
-      );
-      let colorY = lerp(
-        animatedPositions[index].y,
-        targetY + colorEffectY,
-        0.2
       );
 
       push();
