@@ -1,7 +1,6 @@
 let img;
 let song;
 let fft;
-let amplitude; // NEW: for amplitude reactivity
 let playButton;
 let sliceSlider;
 let dampingSlider;
@@ -36,10 +35,6 @@ let scalingIndex = 1;
 
 let maxDimension;
 
-// NEW: flag to switch between FFT and Amplitude reactivity.
-let useAmplitude = false;
-let toggleReactivityButton; // reference for the new toggle button
-
 function preload() {
   img = loadImage("assets/images/replacement.jpg");
   song = loadSound("assets/audio/Fall Murders Summer DEMO MAS1.mp3");
@@ -65,11 +60,8 @@ function setup() {
 function draw() {
   background(bgColorPicker.value());
 
-  // Only compute FFT if not in amplitude mode
-  if (!useAmplitude) {
-    let spectrum = fft.analyze();
-    smoothSpectrum(spectrum);
-  }
+  let spectrum = fft.analyze();
+  smoothSpectrum(spectrum);
 
   processVisualEffects();
 
@@ -153,11 +145,6 @@ function togglePlay() {
     song.loop();
     isPlaying = true;
     document.getElementById("play-button").innerText = "Stop";
-    // If using amplitude mode and amplitude hasn't been initialized, create it.
-    if (useAmplitude && !amplitude) {
-      amplitude = new p5.Amplitude();
-      amplitude.setInput(song);
-    }
   }
 }
 
@@ -181,6 +168,7 @@ function addAttractionPoint() {
   let sliderLabel = createDiv(`A${attractionIndex}`);
   sliderLabel.style("color", "red");
   sliderLabel.style("margin-left", "8px");
+  sliderLabel.style("margin-top", "-15px");
   sliderLabel.style("margin-top", "-15px");
   sliderLabel.style("background-color", "rgba(255, 0, 0, 0.35)");
   sliderLabel.style("border-radius", "4px");
@@ -398,26 +386,20 @@ function processVisualEffects() {
       let colorEffectY = 0;
       let colorScaleFactor = 1;
 
-      // Process attraction points
       for (let point of attractionPoints) {
         let distance = dist(point.x, point.y, targetX, targetY);
         if (distance < radiusSlider.value()) {
           let distanceFactor = map(distance, 0, radiusSlider.value(), 10, 0.1);
-          let intensity;
-          if (!useAmplitude) {
-            intensity = map(
-              previousSpectrum[
-                floor(map(distance, 0, width, 0, previousSpectrum.length))
-              ],
-              0,
-              255,
-              0,
-              point.slider.value()
-            );
-          } else {
-            let ampLevel = amplitude ? amplitude.getLevel() : 0;
-            intensity = map(ampLevel, 0, 1, 0, point.slider.value());
-          }
+          let intensity = map(
+            previousSpectrum[
+              floor(map(distance, 0, width, 0, previousSpectrum.length))
+            ],
+            0,
+            255,
+            0,
+            point.slider.value()
+          );
+
           let dx = (point.x - targetX) * 0.002 * intensity;
           let dy = (point.y - targetY) * 0.002 * intensity;
 
@@ -429,7 +411,6 @@ function processVisualEffects() {
         }
       }
 
-      // Process motion-stopping circles (unchanged)
       for (let circle of motionStoppingCircles) {
         let distToCircle = dist(
           circle.x,
@@ -455,36 +436,23 @@ function processVisualEffects() {
         }
       }
 
-      // Process scaling points
       for (let scalePoint of scalingPoints) {
         let distance = dist(scalePoint.x, scalePoint.y, targetX, targetY);
         let scaleRadius = scaleRadiusSlider.value();
 
         if (distance < scaleRadius) {
-          let audioIntensity;
-          if (!useAmplitude) {
-            let freqIndex = floor(
-              map(distance, 0, width, 0, previousSpectrum.length)
-            );
-            freqIndex = constrain(freqIndex, 0, previousSpectrum.length - 1);
+          let freqIndex = floor(
+            map(distance, 0, width, 0, previousSpectrum.length)
+          );
+          freqIndex = constrain(freqIndex, 0, previousSpectrum.length - 1);
 
-            audioIntensity = map(
-              previousSpectrum[freqIndex],
-              0,
-              255,
-              1,
-              scalePoint.intensitySlider.value()
-            );
-          } else {
-            let ampLevel = amplitude ? amplitude.getLevel() : 0;
-            audioIntensity = map(
-              ampLevel,
-              0,
-              1,
-              1,
-              scalePoint.intensitySlider.value()
-            );
-          }
+          let audioIntensity = map(
+            previousSpectrum[freqIndex],
+            0,
+            255,
+            1,
+            scalePoint.intensitySlider.value()
+          );
 
           let scalingFactor = map(
             distance,
@@ -593,25 +561,6 @@ function initializeControls() {
 
   imageInput = select("#image-input");
   imageInput.changed(handleImageUpload);
-
-  // NEW: Initialize the toggle reactivity button
-  toggleReactivityButton = select("#toggle-reactivity-button");
-  toggleReactivityButton.mousePressed(toggleReactivity);
-}
-
-// NEW: Toggle reactivity between FFT (current) and Amplitude mode
-function toggleReactivity() {
-  useAmplitude = !useAmplitude;
-  if (useAmplitude) {
-    toggleReactivityButton.html("Switch to FFT Reactivity");
-    // If the song is playing and amplitude hasn't been created, initialize it.
-    if (song && song.isPlaying() && !amplitude) {
-      amplitude = new p5.Amplitude();
-      amplitude.setInput(song);
-    }
-  } else {
-    toggleReactivityButton.html("Switch to Amplitude Reactivity");
-  }
 }
 
 function mousePressed(event) {

@@ -4,11 +4,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Sketch</title>
-
     <link rel="stylesheet" type="text/css" href="style.css">
-
     <script src="libraries/p5.min.js"></script>
     <script src="libraries/p5.sound.min.js"></script>
 </head>
@@ -70,7 +67,6 @@
             <h3>Uploads</h3> <br>
             <label class="custom-file-upload" for="image-input">Upload Image</label>
             <input type="file" id="image-input" accept="image/*">
-
             <label class="custom-file-upload" for="audio-input">Upload Audio</label>
             <input type="file" id="audio-input" accept="audio/*">
         </div>
@@ -80,7 +76,11 @@
             <input type="color" id="bg-color-picker" value="#D1D1D1">
         </div>
 
-
+        <!-- New reactivity toggle button -->
+        <div class="reactivity-toggle block">
+            <h3>Reactivity Mode</h3> <br>
+            <button id="toggle-reactivity-button">Switch to Amplitude Reactivity</button>
+        </div>
     </div>
 
     <div id="intensity-panel">
