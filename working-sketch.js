@@ -27,7 +27,7 @@ let selectedItem = null;
 let isOpaque = true;
 let isPlaying = false;
 
-let dampingValue = 0.7;
+let dampingValue = 0.75;
 let lastClearTime = 0;
 let attractionIndex = 1;
 let circleIndex = 1;
